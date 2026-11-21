@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ES20bis Autres angles au compas</title>
+<style>
+:root{--cy:#0099b8;--box:#dbeaf6;--ink:#222}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:var(--ink);font-family:"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:1400px;margin:0 auto;padding:10px 16px 14px}
+h1{margin:0 0 8px;color:var(--cy);font-size:32px;display:flex;align-items:center;gap:12px;border-bottom:3px solid var(--cy);padding-bottom:6px}
+h1 .es{background:var(--cy);color:#fff;font-size:24px;padding:2px 10px;border-radius:3px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.tab{border:2px solid var(--cy);background:#fff;color:var(--cy);border-radius:20px;padding:5px 16px;font-size:17px;cursor:pointer;font-weight:600;font-family:inherit}
+.tab.on{background:var(--cy);color:#fff}
+.box{background:var(--box);padding:10px 16px;font-size:20px;line-height:1.5;border-radius:3px;margin:8px 0}
+.box .it{margin-left:14px;white-space:nowrap;font-weight:700}
+.hl{border-radius:4px;padding:0 4px;transition:background .4s}
+.hl.on{background:#ffe680}
+.nav{display:flex;align-items:center;gap:12px;margin:0 0 8px}
+.nb{font:inherit;border:2px solid var(--cy);background:#fff;color:var(--cy);border-radius:8px;padding:7px 18px;font-size:18px;font-weight:700;cursor:pointer}
+.nb:hover{background:#e6f6fa}
+.nb.alt{border-color:#e07b00;color:#c26400}
+.nb.alt:hover{background:#fff3e0}
+.nb.go{background:var(--cy);color:#fff}
+.nb.go:hover{background:#007f9a}
+.dots{flex:1;display:flex;gap:7px;justify-content:center;flex-wrap:wrap}
+.dots i{width:12px;height:12px;border-radius:50%;background:#cfe6ee}
+.dots i.on{background:var(--cy)}
+.dots i.cur{box-shadow:0 0 0 3px #bfe3ee}
+.main{display:block}
+.stagewrap{border:1px solid #cfe0ea;border-radius:8px;background:#fff;cursor:pointer}
+svg{display:block;width:100%;height:auto;max-height:calc(100vh - 190px);min-height:300px}
+svg text{font-family:"Segoe UI",Helvetica,Arial,sans-serif}
+.panel h2{margin:0 0 8px;font-size:19px;color:var(--cy)}
+.ln{border-left:7px solid;border-radius:4px;padding:6px 10px;margin:0 0 6px;font-size:16.5px;line-height:1.35;transition:opacity .5s}
+.ln .n{display:inline-block;color:#fff;font-weight:700;font-size:14px;padding:0 7px;border-radius:3px;margin-right:8px}
+.ln .fo{margin-top:3px;font-weight:700;font-size:19px;color:#0b4a5c}
+@media(max-width:860px){.main{grid-template-columns:1fr}h1{font-size:24px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <h1><span class="es">ES20bis</span>Autres angles au compas</h1>
+ <div class="tabs" id="tabs"></div>
+ <div class="nav">
+  <button class="nb" id="bPrev">◀ Précédent</button>
+  <button class="nb alt" id="bAlt" style="display:none">Autre solution</button>
+  <div class="dots" id="dots"></div>
+  <button class="nb go" id="bNext">Suivant ▶</button>
+ </div>
+ <div class="main">
+  <div class="stagewrap" id="sw"><svg id="stage" viewBox="0 0 830 560"></svg></div>
+ </div>
+</div>
+<script>
+const NS="http://www.w3.org/2000/svg";
+const svg=document.getElementById("stage");
+const $=id=>document.getElementById(id);
+const INK="#222",RED="#d6232a",DRED="#a5121a";
+let rafs=new Set(),tos=new Set();
+function mk(tag,at,par){const e=document.createElementNS(NS,tag);for(const k in at)e.setAttribute(k,at[k]);(par||svg).appendChild(e);return e}
+function ghost(e){e.style.opacity=0;return e}
+function fade(e,a,dur=500,delay=0){
+  e.style.transition="none";
+  if(!a){e.style.opacity=1;return}
+  e.style.opacity=0;void e.getBoundingClientRect();
+  e.style.transition=`opacity ${dur}ms ease ${delay}ms`;e.style.opacity=1;
+}
+function draw(e,a,dur=900,delay=0){
+  if(!a){e.style.transition="none";e.style.opacity=1;e.style.strokeDasharray="";return}
+  const L=e.getTotalLength();
+  e.style.transition="none";e.style.strokeDasharray=L;e.style.strokeDashoffset=L;e.style.opacity=1;
+  void e.getBoundingClientRect();
+  e.style.transition=`stroke-dashoffset ${dur}ms ease-in-out ${delay}ms`;e.style.strokeDashoffset=0;
+  tos.add(setTimeout(()=>{e.style.strokeDasharray="";e.style.transition="none"},dur+delay+60));
+}
+function at(ms,f){tos.add(setTimeout(f,ms))}
+function cancelAll(){rafs.forEach(cancelAnimationFrame);rafs.clear();tos.forEach(clearTimeout);tos.clear()}
+function txt(par,x,y,s,col=INK,size=26,anchor="middle",w=600){
+  const t=mk("text",{x,y,fill:col,"font-size":size,"text-anchor":anchor,"font-weight":w},par);t.textContent=s;return t;
+}
+function dot(par,p,col,r=5){return mk("circle",{cx:p.x,cy:p.y,r,fill:col},par)}
+
+/* ---------- géométrie ---------- */
+const TS=0.6,D=x=>x*TS;
+const O={x:320,y:300},R0=115,R2=115,WR=72,LB=250,AL=440;
+const rad=d=>d*Math.PI/180;
+const P=(t,r=R0,C=O)=>({x:C.x+r*Math.cos(rad(t)),y:C.y-r*Math.sin(rad(t))});
+function arcD(C,r,t1,t2){
+  const p1=P(t1,r,C),p2=P(t2,r,C);
+  return `M${p1.x} ${p1.y}A${r} ${r} 0 ${Math.abs(t2-t1)>180?1:0} 0 ${p2.x} ${p2.y}`;
+}
+function wedgeD(t1,t2,r){
+  const p1=P(t1,r),p2=P(t2,r);
+  return `M${O.x} ${O.y}L${p1.x} ${p1.y}A${r} ${r} 0 ${t2-t1>180?1:0} 0 ${p2.x} ${p2.y}Z`;
+}
+const pathEl=(d,col,w=3.2)=>ghost(mk("path",{d,fill:"none",stroke:col,"stroke-width":w,"stroke-linecap":"round"}));
+function ptAt(name,p,t,col,off=26){
+  const g=ghost(mk("g",{}));
+  dot(g,p,col,5.5);
+  const u={x:Math.cos(rad(t)),y:-Math.sin(rad(t))},n={x:-u.y,y:u.x};
+  txt(g,p.x+n.x*off,p.y+n.y*off+8,name,col,26);
+  return g;
+}
+function wedgeG(t1,t2,r,fill,col,label,lr){
+  const g=ghost(mk("g",{}));
+  mk("path",{d:wedgeD(t1,t2,r),fill,"fill-opacity":.7,stroke:col,"stroke-width":2},g);
+  const lp=P((t1+t2)/2,lr);
+  const tt=txt(g,lp.x,lp.y+8,label,DRED,22,"middle",700);tt.style.paintOrder="stroke";tt.style.stroke="#fff";tt.style.strokeWidth="4px";
+  return g;
+}
+const dirPhi=(Cc,Q)=>Math.atan2(-(Q.y-Cc.y),Q.x-Cc.x)*180/Math.PI;
+const lrFor=(span,r)=>span<=20?r+78:span<=50?r+26:(span<=60?r*0.62:r*0.58);
+
+
+/* ---------- constructions ---------- */
+const PAL=["#1f5fbf","#e07b00","#1a9a55","#7a3bbf","#0099b8","#c2185b","#8d6e00"];
+let ci=0;const nc=()=>PAL[ci++%PAL.length];
+function lnArcO(maxT){
+  const c=nc(),arc=pathEl(arcD(O,R0,-10,maxT),c),p=ptAt("P",P(0),0,c);
+  return {dur:D(1900),run(a,t0){draw(arc,a,D(1300),t0);fade(p,a,D(400),t0+D(1400))}};
+}
+function lnCross(fromT,toT,toN){
+  const c=nc(),Cc=P(fromT),Pn=P(toT),phi=dirPhi(Cc,Pn);
+  const arc=pathEl(arcD(Cc,R0,phi-20,phi+20),c),p=ptAt(toN,Pn,toT,c);
+  const E=P(toT,190),ds=ghost(mk("line",{x1:O.x,y1:O.y,x2:E.x,y2:E.y,stroke:c,"stroke-width":2.2,"stroke-dasharray":"9 7","stroke-linecap":"round"}));
+  return {dur:D(1500),run(a,t0){draw(arc,a,D(900),t0);fade(p,a,D(400),t0+D(950));fade(ds,a,D(600),t0+D(1000))}};
+}
+function lnProlong(){
+  const c=nc(),S=P(180),E=P(180,235);
+  const ln=ghost(mk("line",{x1:O.x,y1:O.y,x2:E.x,y2:E.y,stroke:c,"stroke-width":3,"stroke-dasharray":"10 7","stroke-linecap":"round"}));
+  const p=ptAt("S",S,180,c);
+  return {dur:D(1500),run(a,t0){fade(ln,a,D(700),t0);fade(p,a,D(400),t0+D(700))}};
+}
+function lnBis(aT,bT,mName,R2=R0){
+  const c=nc(),h=(bT-aT)/2,m=(aT+bT)/2;
+  const dM=R0*Math.cos(rad(h))+Math.sqrt(R2*R2-Math.pow(R0*Math.sin(rad(h)),2));
+  const Mp=P(m,dM);
+  const arcs=[aT,bT].map(t=>{const Cc=P(t),phi=dirPhi(Cc,Mp);return pathEl(arcD(Cc,R2,phi-17,phi+17),c)});
+  const p=ptAt(mName,Mp,m,c,34);
+  return {dur:D(1600),run(a,t0){arcs.forEach(e=>draw(e,a,D(900),t0));fade(p,a,D(400),t0+D(950))}};
+}
+function lnRayC(T,hitN){
+  const c=nc(),E=P(T,190);
+  const ln=ghost(mk("line",{x1:O.x,y1:O.y,x2:E.x,y2:E.y,stroke:c,"stroke-width":2.2,"stroke-dasharray":"9 7","stroke-linecap":"round"}));
+  const p=ptAt(hitN,P(T),T,c);
+  return {dur:D(1300),run(a,t0){fade(ln,a,D(800),t0);fade(p,a,D(400),t0+D(850))}};
+}
+function lnDash(T){
+  const c=nc(),E=P(T,250);
+  const ln=ghost(mk("line",{x1:O.x,y1:O.y,x2:E.x,y2:E.y,stroke:c,"stroke-width":3,"stroke-dasharray":"10 7","stroke-linecap":"round"}));
+  return {dur:D(1000),run(a,t0){fade(ln,a,D(700),t0)}};
+}
+function lnTransport(centerT,chord,toT,toN){
+  const c=nc(),Cc=P(centerT),Pn=P(toT),phi=dirPhi(Cc,Pn);
+  const arc=pathEl(arcD(Cc,chord,phi-70,phi+70),c),p=ptAt(toN,Pn,toT,c);
+  return {dur:D(1500),run(a,t0){draw(arc,a,D(900),t0);fade(p,a,D(400),t0+D(950))}};
+}
+function lnRay(T,f,parts){
+  const E=P(T,LB),Lb=P(T,LB+26);
+  const ray=ghost(mk("line",{x1:O.x,y1:O.y,x2:E.x,y2:E.y,stroke:RED,"stroke-width":3.8,"stroke-linecap":"round"}));
+  const gB=ghost(mk("g",{}));dot(gB,E,RED,5);txt(gB,Lb.x,Lb.y+9,"B",RED,26);
+  const ws=(parts||[[0,T,T+"°"]]).map((q,i)=>wedgeG(q[0],q[1],WR,i?"#f8c8dc":"#bfe3f3",i?"#c2185b":"#0099b8",q[2],lrFor(q[1]-q[0],WR)));
+  return {f,dur:D(1800),run(a,t0){draw(ray,a,D(900),t0);fade(gB,a,D(400),t0+D(900));ws.forEach(w=>fade(w,a,D(600),t0+D(1000)))}};
+}
+const pre90=()=>[lnArcO(195),lnProlong(),lnBis(0,180,"M",190),lnRayC(90,"T")];
+
+const LET=[
+ {k:"a",lab:"a) 90°",sols:[()=>[lnArcO(195),lnProlong(),lnBis(0,180,"M",190),lnRay(90,"Médiatrice du segment PS")]]},
+ {k:"b",lab:"b) 45°",sols:[()=>[...pre90(),lnBis(0,90,"N"),lnRay(45,"45° = 90° / 2")]]},
+ {k:"c",lab:"c) 75°",sols:[()=>[...pre90(),lnBis(0,90,"N"),lnRayC(45,"U"),lnCross(45,105,"V"),lnBis(45,105,"W"),lnRay(75,"75° = 45° + 30°",[[0,45,"45°"],[45,75,"30°"]])]]},
+ {k:"d",lab:"d) 105°",sols:[()=>[...pre90(),lnBis(0,90,"N"),lnRayC(45,"U"),lnCross(45,105,"V"),lnRay(105,"105° = 45° + 60°",[[0,45,"45°"],[45,105,"60°"]])]]},
+ {k:"e",lab:"e) 135°",sols:[()=>[...pre90(),lnBis(90,180,"N"),lnRay(135,"135° = 90° + 45°",[[0,90,"90°"],[90,135,"45°"]])]]}
+];
+
+/* ---------- moteur ---------- */
+let cur={p:0,s:0,sol:0},fN=0;
+$("tabs").innerHTML=LET.map((l,i)=>`<button class="tab" data-i="${i}">${l.lab}</button>`).join("");
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>go(+b.dataset.i,0,false,0));
+function base(){
+  const A={x:O.x+AL,y:O.y};
+  mk("line",{x1:O.x,y1:O.y,x2:A.x,y2:A.y,stroke:INK,"stroke-width":3.8,"stroke-linecap":"round"});
+  const g=mk("g",{});dot(g,O,INK,5.5);dot(g,A,INK,5.5);
+  txt(g,O.x-18,O.y+32,"O");txt(g,A.x+4,A.y+34,"A");
+}
+function addLine(l,anim){
+  const t=mk("text",{x:470,y:490+fN*0,fill:"#0b4a5c","font-size":32,"font-weight":700},svg);
+  t.textContent=l.f;
+  if(anim){t.style.opacity=0;void t.getBoundingClientRect();t.style.transition="opacity .6s";t.style.opacity=1}
+}
+function go(p,s,anim,sol){
+  cancelAll();svg.innerHTML="";fN=0;ci=0;
+  base();
+  const lines=LET[p].sols[sol]();
+  let t=0;
+  if(s>=1){
+    lines.forEach(l=>{
+      l.run(anim,t);
+      if(l.f){if(anim)at(t+D(1000),()=>addLine(l,true));else addLine(l,false)}
+      t+=l.dur;
+    });
+  }
+  cur={p,s,sol};
+  document.querySelectorAll(".tab").forEach((tb,i)=>tb.classList.toggle("on",i===p));
+  $("dots").innerHTML=[0,1].map(i=>`<i class="${i<=s?"on":""} ${i===s?"cur":""}"></i>`).join("");
+  $("bPrev").style.visibility=(p===0&&s===0)?"hidden":"visible";
+  $("bNext").style.visibility=(p===LET.length-1&&s===1)?"hidden":"visible";
+  const ba=$("bAlt");ba.style.display="none";
+  ba.textContent=sol<LET[p].sols.length-1?"Autre solution":"Première solution";
+  if(LET[p].sols.length>1&&s===1)at(anim?t+300:0,()=>{ba.style.display=""});
+}
+function next(){
+  const {p,s}=cur;
+  if(s===0)go(p,1,true,cur.sol);else if(p<LET.length-1)go(p+1,0,false,0);
+}
+function prev(){
+  const {p,s}=cur;
+  if(s===1)go(p,0,false,0);
+  else if(p>0)go(p-1,1,false,0);
+}
+$("bNext").onclick=e=>{e.stopPropagation();next()};
+$("bPrev").onclick=e=>{e.stopPropagation();prev()};
+$("bAlt").onclick=e=>{e.stopPropagation();go(cur.p,1,true,(cur.sol+1)%LET[cur.p].sols.length)};
+$("sw").onclick=next;
+document.addEventListener("keydown",e=>{
+  if(["ArrowRight","PageDown"," ","Enter"].includes(e.key)){e.preventDefault();next()}
+  else if(["ArrowLeft","PageUp","Backspace"].includes(e.key)){e.preventDefault();prev()}
+});
+go(0,0,false,0);
+</script>
+</body>
+</html>

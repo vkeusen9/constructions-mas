@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ES36 Dictée géométrique</title>
+<style>
+:root{--cy:#0099b8;--ink:#222;--gr:#2e9e4f}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:var(--ink);font-family:"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:1280px;margin:0 auto;padding:10px 18px 14px}
+h1{margin:0 0 8px;font-size:28px;color:var(--cy);border-bottom:2px solid var(--cy);padding-bottom:6px;display:flex;align-items:center;gap:12px}
+h1 small{color:var(--cy);font-size:28px}
+.ring{display:inline-block;width:30px;height:30px;border:7px solid #bfe3ee;border-radius:50%;flex:none}
+button{font:inherit}
+.nb{border:2px solid var(--cy);background:#fff;color:var(--cy);border-radius:8px;padding:8px 18px;font-size:18px;font-weight:700;cursor:pointer}
+.nb:hover{background:#e6f6fa}
+.nb.go{background:var(--cy);color:#fff}
+.nb.go:hover{background:#007f9a}
+.nav{display:flex;align-items:center;gap:12px;margin:0 0 10px}
+.dots{flex:1;display:flex;gap:7px;justify-content:center;flex-wrap:wrap}
+.dots i{width:12px;height:12px;border-radius:50%;background:#cfe6ee}
+.dots i.on{background:var(--cy)}
+.dots i.cur{box-shadow:0 0 0 3px #bfe3ee}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:14px;align-items:start}
+.card{border:1px solid #cfe0ea;border-radius:8px;background:#fff;padding:6px 8px 8px}
+.card h2{margin:0 0 4px;font-size:15px;font-weight:700;color:var(--cy);text-transform:uppercase;letter-spacing:.04em}
+svg{display:block;width:100%;height:auto}
+#stage{max-height:calc(100vh - 190px);cursor:pointer}
+svg text{font-family:"Segoe UI",Helvetica,Arial,sans-serif}
+#steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+#steps li{border-radius:6px;padding:9px 12px 9px 12px;font-size:19px;line-height:1.35;opacity:0;transition:opacity .5s;display:flex;gap:10px}
+#steps li.on{opacity:1}
+#steps .n{flex:none;font-weight:800;color:#555;width:1.3em}
+#steps i{font-style:italic}
+.res{display:block;margin-top:6px;font-weight:700;opacity:0;transition:opacity .6s}
+.res.on{opacity:1}
+.hat{position:relative;display:inline-block;font-style:italic}
+.hat::before{content:"";position:absolute;left:8%;right:8%;top:-.1em;height:.3em;border-top:1.6px solid currentColor;border-radius:50% 50% 0 0/100% 100% 0 0}
+@media(max-width:900px){.grid{grid-template-columns:1fr}#stage{max-height:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <h1><span class="ring"></span><small>ES36</small> Dictée géométrique</h1>
+ <div class="nav">
+  <button class="nb" id="bPrev">◀ Précédent</button>
+  <div class="dots" id="dots"></div>
+  <button class="nb go" id="bNext">Suivant ▶</button>
+ </div>
+ <div class="grid">
+    <div class="card"><h2>Construction</h2><svg id="stage" viewBox="0 20 460 400"></svg></div>
+  <div class="card"><h2>Marche à suivre</h2>
+   <ol id="steps">
+    <li style="background:#fde2e4"><span class="n">1.</span><span>Tracer un cercle de centre <i>O</i> et de rayon 3 cm.</span></li>
+    <li style="background:#fff1c9"><span class="n">2.</span><span>Tracer un diamètre <i>BC</i> de ce cercle.</span></li>
+    <li style="background:#dff3e0"><span class="n">3.</span><span>Construire la droite perpendiculaire à <i>BC</i> passant par le point <i>C</i>.</span></li>
+    <li style="background:#d9ecfa"><span class="n">4.</span><span>Placer un point <i>M</i> sur cette droite tel que le segment <i>CM</i> mesure 4 cm.</span></li>
+    <li style="background:#ebe0f7"><span class="n">5.</span><span>Tracer le segment <i>BM</i> ; il coupe le cercle en <i>R</i>.</span></li>
+    <li style="background:#ffe3cc"><span class="n">6.</span><span>Mesurer les angles <span class="hat">MBC</span> et <span class="hat">RCM</span>.<span class="res" id="res"><span class="hat">MBC</span> ≈ 34° et <span class="hat">RCM</span> ≈ 34°</span></span></li>
+   </ol>
+  </div>
+ </div>
+</div>
+<script>
+const NS="http://www.w3.org/2000/svg";
+const svg=document.getElementById("stage");
+const OR="#e07b00",INK="#222",CY="#1a8fd0",GR="#2e9e4f";
+const $=id=>document.getElementById(id);
+let timers=[];
+
+/* ---------- outils SVG ---------- */
+function mk(tag,at,par){const e=document.createElementNS(NS,tag);for(const k in at)e.setAttribute(k,at[k]);(par||svg).appendChild(e);return e}
+function ghost(e){e.style.opacity=0;return e}
+function at(ms,f){timers.push(setTimeout(f,ms))}
+function cancelAll(){timers.forEach(clearTimeout);timers=[]}
+function fade(e,a,dur=500,delay=0){
+  e.style.transition="none";
+  if(!a){e.style.opacity=1;return}
+  e.style.opacity=0;void e.getBoundingClientRect();
+  e.style.transition=`opacity ${dur}ms ease ${delay}ms`;e.style.opacity=1;
+}
+function draw(e,a,dur=900,delay=0){
+  if(!a){e.style.transition="none";e.style.opacity=1;e.style.strokeDasharray="";return}
+  const L=e.getTotalLength();
+  e.style.transition="none";e.style.strokeDasharray=L;e.style.strokeDashoffset=L;e.style.opacity=1;
+  void e.getBoundingClientRect();
+  e.style.transition=`stroke-dashoffset ${dur}ms ease-in-out ${delay}ms`;e.style.strokeDashoffset=0;
+  at(dur+delay+60,()=>{e.style.strokeDasharray="";e.style.transition="none"});
+}
+function txt(par,x,y,s,col=INK,size=28,anchor="middle",w=600,ital=true){
+  const t=mk("text",{x,y,fill:col,"font-size":size,"text-anchor":anchor,"font-weight":w,"font-style":ital?"italic":"normal"},par);t.textContent=s;return t;
+}
+function dot(par,p,col=INK,r=5){return mk("circle",{cx:p.x,cy:p.y,r,fill:col},par)}
+function coinL(par,c,d1,d2,off=9,len=13,w=2.6,col=INK){
+  const q={x:c.x+off*(d1.x+d2.x),y:c.y+off*(d1.y+d2.y)};
+  const p1={x:q.x+len*d1.x,y:q.y+len*d1.y},p2={x:q.x+len*d2.x,y:q.y+len*d2.y};
+  mk("polyline",{points:`${p1.x},${p1.y} ${q.x},${q.y} ${p2.x},${p2.y}`,fill:"none",stroke:col,"stroke-width":w},par);
+}
+function arcPath(C,r,a1,a2){
+  const p=a=>({x:C.x+r*Math.cos(a),y:C.y+r*Math.sin(a)});
+  const p1=p(a1),p2=p(a2);
+  return `M${p1.x} ${p1.y}A${r} ${r} 0 ${Math.abs(a2-a1)>Math.PI?1:0} 1 ${p2.x} ${p2.y}`;
+}
+function head(par,p,d,col){
+  const s=10,w=4,b={x:p.x-d.x*s,y:p.y-d.y*s},n={x:-d.y,y:d.x};
+  mk("polygon",{points:`${p.x},${p.y} ${b.x+n.x*w},${b.y+n.y*w} ${b.x-n.x*w},${b.y-n.y*w}`,fill:col},par);
+}
+/* cote : double flèche brisée, texte au milieu, traits de repère */
+function cote(par,p1,p2,label,col,ext,gap=36,size=24){
+  const L=Math.hypot(p2.x-p1.x,p2.y-p1.y),d={x:(p2.x-p1.x)/L,y:(p2.y-p1.y)/L};
+  const m={x:(p1.x+p2.x)/2,y:(p1.y+p2.y)/2};
+  const a1={x:m.x-d.x*gap,y:m.y-d.y*gap},a2={x:m.x+d.x*gap,y:m.y+d.y*gap};
+  const ln=(a,b,w)=>mk("line",{x1:a.x,y1:a.y,x2:b.x,y2:b.y,stroke:col,"stroke-width":w},par);
+  ln(p1,a1,1.4);ln(a2,p2,1.4);
+  head(par,p1,{x:-d.x,y:-d.y},col);head(par,p2,d,col);
+  ext.forEach(([a,b])=>ln(a,b,1));
+  const vertical=Math.abs(d.y)>Math.abs(d.x);
+  const t=txt(par,m.x,m.y+8,label,col,size,"middle",700,false);
+  if(vertical)t.setAttribute("transform",`rotate(-90 ${m.x} ${m.y})`);
+  return t;
+}
+
+/* ---------- géométrie (1 cm = 40 unités) ---------- */
+const O={x:175,y:270},B={x:55,y:270},C={x:295,y:270},M={x:295,y:110};
+const tR=9/13;                                   // BM coupe le cercle à t = 9/13
+const R={x:B.x+tR*(M.x-B.x),y:B.y+tR*(M.y-B.y)};
+const ang=(P,Q)=>Math.atan2(Q.y-P.y,Q.x-P.x);
+const r1=55,r2=85,hS=Math.sqrt(r2*r2-r1*r1);
+const P={x:C.x-r1,y:C.y},Q={x:C.x+r1,y:C.y},S={x:C.x,y:C.y-hS};
+const rad3=[[{x:B.x,y:278},{x:B.x,y:318}],[{x:O.x,y:278},{x:O.x,y:318}]];
+const cote3=[{x:B.x,y:308},{x:O.x,y:308}];
+const cote4=[{x:405,y:M.y},{x:405,y:C.y}];
+const ext4=[[{x:M.x+8,y:M.y},{x:413,y:M.y}],[{x:C.x+r1+40,y:C.y},{x:413,y:C.y}]];
+const aB=ang(B,M),aC1=ang(C,R),aC2=ang(C,M);
+const lblB={x:B.x+88*Math.cos(aB/2),y:B.y+88*Math.sin(aB/2)};
+const lblC={x:C.x+100*Math.cos((aC1+aC2)/2),y:C.y+100*Math.sin((aC1+aC2)/2)+6};
+lblB.y+=6;
+
+/* ---------- construction ---------- */
+function build(){
+  svg.innerHTML="";
+  /* étape 1 : le cercle */
+  const circ=ghost(mk("circle",{cx:O.x,cy:O.y,r:120,fill:"none",stroke:INK,"stroke-width":1.7}));
+  const g3=ghost(mk("g",{}));cote(g3,cote3[0],cote3[1],"3 cm",OR,rad3,30,24);
+  /* étape 2 : le diamètre */
+  const dia=ghost(mk("line",{x1:B.x,y1:B.y,x2:C.x,y2:C.y,stroke:INK,"stroke-width":1.7,"stroke-linecap":"round"}));
+  /* étape 3 : la perpendiculaire au compas, avec le prolongement de BC en traitillé */
+  const ext=ghost(mk("line",{x1:C.x,y1:C.y,x2:C.x+r1+30,y2:C.y,stroke:INK,"stroke-width":1.7,"stroke-dasharray":"8 6"}));
+  const mkArc=(c,r,a1,a2)=>ghost(mk("path",{d:arcPath(c,r,a1,a2),fill:"none",stroke:CY,"stroke-width":1.4,"stroke-linecap":"round"}));
+  const arcC=mkArc(C,r1,Math.PI-.3,2*Math.PI+.3);
+  const aP=ang(P,S),aQ=ang(Q,S);
+  const arcP=mkArc(P,r2,aP-.33,aP+.33);
+  const arcQ=mkArc(Q,r2,aQ-.33,aQ+.33);
+  const perp=ghost(mk("line",{x1:C.x,y1:335,x2:C.x,y2:40,stroke:INK,"stroke-width":1.7,"stroke-linecap":"round"}));
+  /* étape 5 : le segment BM */
+  const bm=ghost(mk("line",{x1:B.x,y1:B.y,x2:M.x,y2:M.y,stroke:INK,"stroke-width":1.7,"stroke-linecap":"round"}));
+  /* étape 6 : le segment RC et les angles */
+  const rc=ghost(mk("line",{x1:R.x,y1:R.y,x2:C.x,y2:C.y,stroke:INK,"stroke-width":1.7,"stroke-linecap":"round"}));
+  const gA=ghost(mk("g",{}));
+  mk("path",{d:arcPath(B,55,aB,0),fill:"none",stroke:OR,"stroke-width":1.9},gA);
+  mk("path",{d:arcPath(C,55,aC1,aC2),fill:"none",stroke:OR,"stroke-width":1.9},gA);
+  txt(gA,lblB.x,lblB.y,"34°",OR,24,"middle",700,false);
+  txt(gA,lblC.x,lblC.y,"34°",OR,24,"middle",700,false);
+  /* points et noms, au-dessus des traits */
+  const gO=ghost(mk("g",{}));dot(gO,O,INK,3.5);txt(gO,O.x+18,O.y-14,"O");
+  const gBC=ghost(mk("g",{}));dot(gBC,B,INK,3.5);dot(gBC,C,INK,3.5);txt(gBC,B.x-24,B.y+10,"B");txt(gBC,C.x+22,C.y+30,"C");
+  const gPQ=ghost(mk("g",{}));dot(gPQ,P,CY,3);dot(gPQ,Q,CY,3);
+  const gS=ghost(mk("g",{}));dot(gS,S,CY,3);
+  const gRA=ghost(mk("g",{}));coinL(gRA,C,{x:-1,y:0},{x:0,y:-1},9,13,1.5);coinL(gRA,C,{x:1,y:0},{x:0,y:-1},9,13,1.5);
+  const gM=ghost(mk("g",{}));dot(gM,M,INK,3.5);txt(gM,M.x-24,M.y+2,"M");
+  const g4=ghost(mk("g",{}));cote(g4,cote4[0],cote4[1],"4 cm",OR,ext4,36,24);
+  const gR=ghost(mk("g",{}));dot(gR,R,INK,3.5);txt(gR,R.x-6,R.y-16,"R");
+  [gO,gBC,gPQ,gS,gRA,gM,gR].forEach(g=>svg.appendChild(g));
+
+  const steps=[
+    {run(a){}},
+    {run(a){draw(circ,a,1400);fade(gO,a,500,a?1200:0);fade(g3,a,600,a?1500:0)}},
+    {run(a){draw(dia,a,900);fade(gBC,a,500,a?800:0)}},
+    {run(a){
+      fade(ext,a,500);draw(arcC,a,900);fade(gPQ,a,400,a?900:0);
+      draw(arcP,a,900,a?1300:0);draw(arcQ,a,900,a?1300:0);
+      fade(gS,a,400,a?2300:0);
+      draw(perp,a,1100,a?2700:0);fade(gRA,a,500,a?3900:0);
+    }},
+    {run(a){fade(gM,a,500);fade(g4,a,600,a?500:0)}},
+    {run(a){draw(bm,a,1100);fade(gR,a,500,a?1200:0)}},
+    {run(a){draw(rc,a,900);fade(gA,a,700,a?1000:0)}}
+  ];
+  return steps;
+}
+
+/* ---------- navigation ---------- */
+const NSTEP=6;
+let steps=null,cur=0;
+const rows=[...document.querySelectorAll("#steps li")];
+function go(s,anim){
+  cancelAll();
+  steps=build();
+  for(let i=1;i<s;i++)steps[i].run(false);
+  steps[s].run(anim);
+  cur=s;
+  rows.forEach((r,i)=>{r.style.transition=(anim&&i===s-1)?"opacity .5s":"none";r.classList.toggle("on",i<s)});
+  const res=$("res");res.style.transition="none";res.classList.remove("on");
+  if(s===NSTEP){void res.offsetWidth;res.style.transition="opacity .6s";at(anim?900:0,()=>res.classList.add("on"))}
+  $("dots").innerHTML=Array.from({length:NSTEP+1},(_,i)=>`<i class="${i<=s?"on":""} ${i===s?"cur":""}"></i>`).join("");
+  $("bPrev").style.visibility=s===0?"hidden":"visible";
+  $("bNext").style.visibility=s===NSTEP?"hidden":"visible";
+}
+const next=()=>{if(cur<NSTEP)go(cur+1,true)};
+const prev=()=>{if(cur>0)go(cur-1,false)};
+$("bNext").onclick=e=>{e.stopPropagation();next()};
+$("bPrev").onclick=e=>{e.stopPropagation();prev()};
+svg.onclick=next;
+document.addEventListener("keydown",e=>{
+  if(["ArrowRight","PageDown"," ","Enter"].includes(e.key)){e.preventDefault();next()}
+  else if(["ArrowLeft","PageUp","Backspace"].includes(e.key)){e.preventDefault();prev()}
+});
+go(0,false);
+</script>
+</body>
+</html>

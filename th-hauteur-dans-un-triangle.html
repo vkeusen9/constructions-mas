@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hauteur d’un triangle</title>
+<style>
+:root{--cy:#0099b8;--box:#dbeaf6;--ink:#222}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:var(--ink);font-family:"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:1000px;margin:0 auto;padding:10px 16px 14px}
+h1{margin:0 0 6px;color:var(--cy);font-size:34px;display:flex;align-items:center;gap:12px;border-bottom:3px solid var(--cy);padding-bottom:6px}
+h1 .ring{width:34px;height:34px;border:7px solid #bfe3ee;border-radius:50%;flex:none}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.tab{border:2px solid var(--cy);background:#fff;color:var(--cy);border-radius:20px;padding:6px 14px;font-size:16px;cursor:pointer;font-weight:600}
+.tab.on{background:var(--cy);color:#fff}
+.box{display:flex;gap:14px;align-items:stretch;margin:10px 0}
+.box .lab{color:var(--cy);font-weight:700;font-size:19px;width:120px;padding-top:12px;flex:none}
+.box .txt{background:var(--box);padding:12px 16px;font-size:22px;line-height:1.4;flex:1;border-radius:3px}
+.stp{margin-top:8px;min-height:66px;font-size:21px;color:#0b4a5c;line-height:1.45}
+.sub{margin-top:6px;font-size:21px;color:#0b4a5c;line-height:1.45}
+.etp{display:inline-block;background:#0099b8;color:#fff;font-size:13px;font-weight:700;padding:1px 7px;border-radius:3px;margin-right:8px;vertical-align:middle}
+.hl{border-radius:4px;padding:0 3px;transition:background .4s}
+.hl.on{background:#ffe680}
+.stagewrap{border:1px solid #cfe0ea;border-radius:8px;background:#fff;cursor:pointer}
+svg{display:block;width:100%;height:auto;max-height:calc(100vh - 290px);min-height:260px}
+svg text{font-family:"Segoe UI",Helvetica,Arial,sans-serif}
+button{font:inherit}
+.nb{border:2px solid var(--cy);background:#fff;color:var(--cy);border-radius:8px;padding:8px 18px;font-size:18px;font-weight:700;cursor:pointer}
+.nb:hover{background:#e6f6fa}
+.nb.go{background:var(--cy);color:#fff}
+.nb.go:hover{background:#007f9a}
+.nav{display:flex;align-items:center;gap:12px;margin:0 0 10px}
+.dots{flex:1;display:flex;gap:7px;justify-content:center;flex-wrap:wrap}
+.dots i{width:12px;height:12px;border-radius:50%;background:#cfe6ee}
+.dots i.on{background:var(--cy)}
+.dots i.cur{box-shadow:0 0 0 3px #bfe3ee}
+@media(max-width:640px){
+ h1{font-size:25px}
+ .box{flex-direction:column;gap:4px}
+ .box .lab{width:auto;padding-top:0}
+ .box .txt{font-size:18px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <h1><span class="ring"></span>Hauteur d’un triangle</h1>
+ <div class="tabs" id="tabs"></div>
+ <div class="box"><div class="lab" id="lab"></div><div class="txt" id="txt"></div></div>
+ <div class="nav">
+  <button class="nb" id="bPrev">◀ Précédent</button>
+  <div class="dots" id="dots"></div>
+  <button class="nb go" id="bNext">Suivant ▶</button>
+ </div>
+ <div class="stagewrap" id="sw"><svg id="stage" viewBox="0 0 900 450"></svg></div>
+</div>
+<script>
+const NS="http://www.w3.org/2000/svg";
+const svg=document.getElementById("stage");
+const OR="#e07b00",RED="#d6232a",INK="#222",CY="#1a8fd0";
+const $=id=>document.getElementById(id);
+let timers=[];
+
+/* ---------- outils SVG ---------- */
+function mk(tag,at,par){const e=document.createElementNS(NS,tag);for(const k in at)e.setAttribute(k,at[k]);(par||svg).appendChild(e);return e}
+function ghost(e){e.style.opacity=0;return e}
+function at(ms,f){timers.push(setTimeout(f,ms))}
+function cancelAll(){timers.forEach(clearTimeout);timers=[]}
+function fade(e,a,dur=500,delay=0){
+  e.style.transition="none";
+  if(!a){e.style.opacity=1;return}
+  e.style.opacity=0;void e.getBoundingClientRect();
+  e.style.transition=`opacity ${dur}ms ease ${delay}ms`;e.style.opacity=1;
+}
+function draw(e,a,dur=900,delay=0){
+  const dash=e.dataset.dash||"";
+  if(!a){e.style.transition="none";e.style.opacity=1;e.style.strokeDasharray=dash;e.style.strokeDashoffset=0;return}
+  const L=e.getTotalLength();
+  e.style.transition="none";e.style.strokeDasharray=L;e.style.strokeDashoffset=L;e.style.opacity=1;
+  void e.getBoundingClientRect();
+  e.style.transition=`stroke-dashoffset ${dur}ms ease-in-out ${delay}ms`;e.style.strokeDashoffset=0;
+  at(dur+delay+60,()=>{e.style.strokeDasharray=dash;e.style.transition="none"});
+}
+function txt(par,x,y,s,col=INK,size=28){
+  const t=mk("text",{x,y,fill:col,"font-size":size,"text-anchor":"middle","font-weight":600,"font-style":"italic"},par);t.textContent=s;return t;
+}
+function dot(par,p,col=INK,r=5){return mk("circle",{cx:p.x,cy:p.y,r,fill:col},par)}
+function ticks(par,p,dir,count,col=INK,len=16,gap=7,w=2.4){
+  const pr={x:-dir.y,y:dir.x};
+  for(let i=0;i<count;i++){
+    const o=(i-(count-1)/2)*gap,c={x:p.x+dir.x*o,y:p.y+dir.y*o};
+    mk("line",{x1:c.x-pr.x*len/2,y1:c.y-pr.y*len/2,x2:c.x+pr.x*len/2,y2:c.y+pr.y*len/2,stroke:col,"stroke-width":w,"stroke-linecap":"round"},par);
+  }
+}
+function coinL(par,c,d1,d2,off=9,len=13,w=2.6,col=INK){
+  const q={x:c.x+off*(d1.x+d2.x),y:c.y+off*(d1.y+d2.y)};
+  const p1={x:q.x+len*d1.x,y:q.y+len*d1.y},p2={x:q.x+len*d2.x,y:q.y+len*d2.y};
+  mk("polyline",{points:`${p1.x},${p1.y} ${q.x},${q.y} ${p2.x},${p2.y}`,fill:"none",stroke:col,"stroke-width":w},par);
+}
+function arcPath(C,r,a1,a2){
+  const p=a=>({x:C.x+r*Math.cos(a),y:C.y+r*Math.sin(a)});
+  const p1=p(a1),p2=p(a2);
+  return `M${p1.x} ${p1.y}A${r} ${r} 0 ${Math.abs(a2-a1)>Math.PI?1:0} 1 ${p2.x} ${p2.y}`;
+}
+const dist=(P,Q)=>Math.hypot(Q.x-P.x,Q.y-P.y);
+const unit=(P,Q)=>{const l=dist(P,Q);return {x:(Q.x-P.x)/l,y:(Q.y-P.y)/l}};
+const ang=(C,P)=>Math.atan2(P.y-C.y,P.x-C.x);
+
+/* ---------- géométrie ---------- */
+const th=8*Math.PI/180;
+const u={x:Math.cos(th),y:-Math.sin(th)};
+const up={x:-Math.sin(th),y:-Math.cos(th)};
+const dn={x:-up.x,y:-up.y};
+const K=.85,HT=140;
+const CASES={
+  1:{O:{x:235,y:262},aA:-30,aB:-170,aC:190,h1:75,ext:null},
+  2:{O:{x:745,y:262},aA:-200,aB:-20,aC:260,h1:80,ext:-310}
+};
+
+/* une figure (cas 1 ou 2) : renvoie les étapes de la méthode choisie */
+function buildCase(cs,method){
+  const c=CASES[cs];
+  const P=(a,b)=>({x:c.O.x+K*(a*u.x+b*up.x),y:c.O.y+K*(a*u.y+b*up.y)});
+  const A=P(c.aA,HT),B=P(c.aB,0),C=P(c.aC,0),H=P(c.aA,0),A2=P(c.aA,-HT);
+  let ext=null;
+  if(c.ext!==null){
+    const E=P(c.ext,0);
+    ext=ghost(mk("line",{x1:B.x,y1:B.y,x2:E.x,y2:E.y,stroke:INK,"stroke-width":2,"stroke-linecap":"round","stroke-dasharray":"9 7"}));
+    ext.dataset.dash="9 7";
+  }
+  mk("polygon",{points:`${A.x},${A.y} ${B.x},${B.y} ${C.x},${C.y}`,fill:"none",stroke:INK,"stroke-width":3.5,"stroke-linejoin":"round"});
+  const gT=mk("g",{});
+  [A,B,C].forEach(p=>dot(gT,p));
+  txt(gT,A.x+up.x*28-18,A.y+up.y*28+4,"A");
+  txt(gT,B.x+dn.x*32-14,B.y+dn.y*32+8,"B");
+  txt(gT,C.x+dn.x*32+14,C.y+dn.y*32+8,"C");
+  const arcStyle={fill:"none",stroke:CY,"stroke-width":1.8,"stroke-linecap":"round"};
+  /* arc qui passe par A et par son symétrique, centré en un point de la droite (BC) */
+  const arcThrough=(Ct,aCt,dv=HT)=>{
+    const r=Math.hypot(Math.abs(c.aA-aCt)*K,dv*K),phi=Math.atan2(dv*K,Math.abs(c.aA-aCt)*K)+.12;
+    const sgn=c.aA>aCt?1:-1;
+    const m=Math.atan2(sgn*u.y,sgn*u.x);
+    return ghost(mk("path",{d:arcPath(Ct,r,m-phi,m+phi),...arcStyle}));
+  };
+  const redL=ghost(mk("line",{x1:P(c.aA,HT+45).x,y1:P(c.aA,HT+45).y,x2:P(c.aA,-HT-45).x,y2:P(c.aA,-HT-45).y,stroke:RED,"stroke-width":3.5,"stroke-linecap":"round"}));
+  const gAng=ghost(mk("g",{}));
+  coinL(gAng,H,u,up);coinL(gAng,H,up,{x:-u.x,y:-u.y});
+  const d0=ext?1000:0;           // temps pour tracer le prolongement avant le premier arc
+  const st=[];
+  const gA2=ghost(mk("g",{}));dot(gA2,A2,INK,4.5);
+  if(method===1){
+    const M=P(c.aA-c.h1,0),N=P(c.aA+c.h1,0);
+    const r1=dist(A,M),aM=ang(A,M),aN=ang(A,N);
+    const arcA=ghost(mk("path",{d:arcPath(A,r1,Math.min(aM,aN)-.2,Math.max(aM,aN)+.2),...arcStyle}));
+    const gMN=ghost(mk("g",{}));
+    dot(gMN,M,INK,4.5);dot(gMN,N,INK,4.5);
+    txt(gMN,M.x+dn.x*34-14,M.y+dn.y*34+8,"M");txt(gMN,N.x+dn.x*34+6,N.y+dn.y*34+8,"N");
+    const DV=70;
+    const arcM=arcThrough(M,c.aA-c.h1,DV),arcN=arcThrough(N,c.aA+c.h1,DV);
+    const Pp=P(c.aA,-DV),Qq=P(c.aA,DV);
+    gA2.innerHTML="";dot(gA2,Pp,INK,4.5);dot(gA2,Qq,INK,4.5);
+    txt(gA2,Pp.x+28,Pp.y+14,"P");txt(gA2,Qq.x+28,Qq.y-6,"Q");
+    st.push(a=>{if(ext)draw(ext,a,900);draw(arcA,a,1300,a?d0:0);fade(gMN,a,500,a?d0+1400:0)});
+    st.push(a=>{draw(arcM,a,1500);draw(arcN,a,1500);fade(gA2,a,500,a?1600:0)});
+    st.push(a=>{draw(redL,a,1100);fade(gAng,a,500,a?1200:0)});
+  }else{
+    const arcB=arcThrough(B,c.aB),arcC=arcThrough(C,c.aC);
+    txt(gA2,A2.x-26,A2.y+30,"A′");
+    const sBA=ghost(mk("line",{x1:B.x,y1:B.y,x2:A2.x,y2:A2.y,stroke:OR,"stroke-width":2.4,"stroke-linecap":"round","stroke-dasharray":"10 8"}));
+    const sCA=ghost(mk("line",{x1:C.x,y1:C.y,x2:A2.x,y2:A2.y,stroke:OR,"stroke-width":2.4,"stroke-linecap":"round","stroke-dasharray":"10 8"}));
+    sBA.dataset.dash="10 8";sCA.dataset.dash="10 8";
+    const gTk=ghost(mk("g",{}));
+    const mid=(p,q)=>({x:(p.x+q.x)/2,y:(p.y+q.y)/2});
+    ticks(gTk,mid(A,B),unit(A,B),1,OR);ticks(gTk,mid(B,A2),unit(B,A2),1,OR);
+    ticks(gTk,mid(A,C),unit(A,C),2,OR);ticks(gTk,mid(C,A2),unit(C,A2),2,OR);
+    st.push(a=>{if(ext)draw(ext,a,900);draw(arcB,a,1500,a?d0:0)});
+    st.push(a=>{draw(arcC,a,1500);fade(gA2,a,500,a?1600:0)});
+    st.push(a=>{draw(sBA,a,800);draw(sCA,a,800,a?400:0);fade(gTk,a,500,a?1300:0)});
+    st.push(a=>{draw(redL,a,1100);fade(gAng,a,500,a?1200:0)});
+  }
+  [gT,gA2].forEach(g=>svg.appendChild(g));
+  svg.appendChild(redL);
+  return st;
+}
+
+function buildScene(method){
+  svg.innerHTML="";svg.setAttribute("viewBox","50 82 960 378");
+  const s1=buildCase(1,method),s2=buildCase(2,method);
+  const D1=method===1?[2100,2300,1800]:[2100,2300,1900,1800];
+  const D2=D1.map((d,i)=>i===0?d+1000:d);
+  const all=[];
+  s1.forEach((f,i)=>all.push([f,D1[i]]));
+  s2.forEach((f,i)=>all.push([f,D2[i]]));
+  const steps=[{run(a){}},{run(a){
+    if(!a){all.forEach(([f])=>f(false));return}
+    let t=0;
+    all.forEach(([f,d])=>{at(t,()=>f(true));t+=d});
+  }}];
+  return {steps};
+}
+
+/* ---------- moteur ---------- */
+const parts=[
+  {tab:"1. Avec la perpendiculaire",lab:"1re méthode",m:1},
+  {tab:"2. Avec un cerf-volant ou un fer de lance",lab:"2e méthode",m:2}
+];
+const HTML='Construire la hauteur issue de A du triangle ABC.';
+let cur={p:0,s:0},scene=null;
+$("tabs").innerHTML=parts.map((p,i)=>`<button class="tab" data-i="${i}">${p.tab}</button>`).join("");
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>go(+b.dataset.i,0,false));
+
+function go(p,s,anim){
+  cancelAll();
+  scene=buildScene(parts[p].m);
+  const n=scene.steps.length;
+  for(let i=0;i<s;i++)scene.steps[i].run(false);
+  scene.steps[s].run(anim);
+  cur={p,s,n};
+  $("lab").textContent=parts[p].lab;
+  $("txt").innerHTML=HTML+(parts[p].m===2?'<div class="sub">On prend B et C comme centres pour tracer un cercle passant par A.</div>':'');
+  document.querySelectorAll(".tab").forEach((t,i)=>t.classList.toggle("on",i===p));
+  $("dots").innerHTML=scene.steps.map((_,i)=>`<i class="${i<=s?"on":""} ${i===s?"cur":""}"></i>`).join("");
+  $("bPrev").style.visibility=(p===0&&s===0)?"hidden":"visible";
+  $("bNext").style.visibility=(p===parts.length-1&&s===n-1)?"hidden":"visible";
+}
+function next(){
+  const {p,s,n}=cur;
+  if(s<n-1)go(p,s+1,true);else if(p<parts.length-1)go(p+1,0,false);
+}
+function prev(){
+  const {p,s}=cur;
+  if(s>0)go(p,s-1,false);
+  else if(p>0){const q=p-1,nn=2;go(q,nn-1,false)}
+}
+$("bNext").onclick=e=>{e.stopPropagation();next()};
+$("bPrev").onclick=e=>{e.stopPropagation();prev()};
+$("sw").onclick=next;
+document.addEventListener("keydown",e=>{
+  if(["ArrowRight","PageDown"," ","Enter"].includes(e.key)){e.preventDefault();next()}
+  else if(["ArrowLeft","PageUp","Backspace"].includes(e.key)){e.preventDefault();prev()}
+});
+go(0,0,false);
+</script>
+</body>
+</html>

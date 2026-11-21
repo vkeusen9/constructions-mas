@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bissectrice d’un angle</title>
+<style>
+:root{--cy:#0099b8;--box:#dbeaf6;--red:#d6232a;--ink:#222}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:var(--ink);font-family:"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:1000px;margin:0 auto;padding:10px 16px 14px}
+h1{margin:0 0 8px;color:var(--cy);font-size:34px;display:flex;align-items:center;gap:12px;border-bottom:3px solid var(--cy);padding-bottom:6px}
+h1 .ring{width:34px;height:34px;border:7px solid #bfe3ee;border-radius:50%;flex:none}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.tab{border:2px solid var(--cy);background:#fff;color:var(--cy);border-radius:20px;padding:6px 14px;font-size:16px;cursor:pointer;font-weight:600}
+.tab.on{background:var(--cy);color:#fff}
+.box{display:flex;gap:14px;align-items:stretch;margin:10px 0}
+.box .lab{color:var(--cy);font-weight:700;font-size:19px;width:120px;padding-top:12px;flex:none}
+.box .txt{background:var(--box);padding:12px 16px;font-size:22px;line-height:1.4;flex:1;border-radius:3px}
+.stp{margin-top:8px;min-height:66px;font-size:21px;color:#0b4a5c;line-height:1.45}
+.etp{display:inline-block;background:#0099b8;color:#fff;font-size:13px;font-weight:700;padding:1px 7px;border-radius:3px;margin-right:8px;vertical-align:middle}
+.hl{border-radius:4px;padding:0 3px;transition:background .4s}
+.hl.on{background:#ffe680}
+.stagewrap{border:1px solid #cfe0ea;border-radius:8px;background:#fff;cursor:pointer}
+svg{display:block;width:100%;height:auto;max-height:calc(100vh - 345px);min-height:300px}
+svg text{font-family:"Segoe UI",Helvetica,Arial,sans-serif}
+#ctl3{display:none;align-items:center;gap:10px;margin:4px 0 8px;flex-wrap:wrap}
+#ctl3 input{flex:1;min-width:180px}
+button{font:inherit}
+.nb{border:2px solid var(--cy);background:#fff;color:var(--cy);border-radius:8px;padding:8px 18px;font-size:18px;font-weight:700;cursor:pointer}
+.nb:hover{background:#e6f6fa}
+.nb.just{border-color:#e07b00;color:#c26400}
+.nb.just:hover{background:#fff3e0}
+.nb.go{background:var(--cy);color:#fff}
+.nb.go:hover{background:#007f9a}
+.nav{display:flex;align-items:center;gap:12px;margin:0 0 10px}
+.dots{flex:1;display:flex;gap:7px;justify-content:center;flex-wrap:wrap}
+.dots i{width:12px;height:12px;border-radius:50%;background:#cfe6ee}
+.dots i.on{background:var(--cy)}
+.dots i.cur{box-shadow:0 0 0 3px #bfe3ee}
+@media(max-width:640px){
+ h1{font-size:25px}
+ .box{flex-direction:column;gap:4px}
+ .box .lab{width:auto;padding-top:0}
+ .box .txt{font-size:18px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <h1><span class="ring"></span>Bissectrice d’un angle</h1>
+ <div class="tabs" id="tabs"></div>
+ <div class="box"><div class="lab" id="lab"></div><div class="txt" id="txt"></div></div>
+ <div class="nav">
+  <button class="nb" id="bPrev">◀ Précédent</button>
+  <button class="nb just" id="bJust" style="display:none">Justification</button>
+  <div class="dots" id="dots"></div>
+  <button class="nb go" id="bNext">Suivant ▶</button>
+ </div>
+ <div id="ctl3">
+  <button class="nb" id="bPause" onclick="ctl.pause()">Pause</button>
+  <button class="nb" id="bReplay" onclick="ctl.replay()">Rejouer</button>
+  <input type="range" id="slider" min="0" max="1000" value="0" aria-label="Position de l’axe de symétrie">
+ </div>
+ <div class="stagewrap" id="sw"><svg id="stage" viewBox="0 0 900 430"></svg></div>
+</div>
+
+<script>
+const NS="http://www.w3.org/2000/svg";
+const svg=document.getElementById("stage");
+const BLUE="#1f5fbf",OR="#e07b00",RED="#d6232a",GREEN="#1a9a55",VIO="#7a3bbf",INK="#222";
+let rafs=new Set();
+let ctl={};
+let jfn=null;
+
+/* ---------- outils SVG ---------- */
+function mk(tag,at,par){const e=document.createElementNS(NS,tag);for(const k in at)e.setAttribute(k,at[k]);(par||svg).appendChild(e);return e}
+function ghost(e){e.style.opacity=0;return e}
+function fade(e,a,dur=500,delay=0){
+  e.style.transition="none";
+  if(!a){e.style.opacity=1;return}
+  e.style.opacity=0;void e.getBoundingClientRect();
+  e.style.transition=`opacity ${dur}ms ease ${delay}ms`;e.style.opacity=1;
+}
+function fadeOut(e,a){e.style.transition=a?"opacity 500ms ease":"none";e.style.opacity=0}
+function draw(e,a,dur=900,delay=0){
+  if(!a){e.style.transition="none";e.style.opacity=1;e.style.strokeDasharray="";return}
+  const L=e.getTotalLength();
+  e.style.transition="none";e.style.strokeDasharray=L;e.style.strokeDashoffset=L;e.style.opacity=1;
+  void e.getBoundingClientRect();
+  e.style.transition=`stroke-dashoffset ${dur}ms ease-in-out ${delay}ms`;e.style.strokeDashoffset=0;
+  setTimeout(()=>{e.style.strokeDasharray="";e.style.transition="none"},dur+delay+60);
+}
+function tween(dur,f,done){
+  const t0=performance.now();
+  const step=now=>{const t=Math.min(1,(now-t0)/dur);f(t);if(t<1){rafs.add(requestAnimationFrame(step))}else if(done)done()};
+  rafs.add(requestAnimationFrame(step));
+}
+const tos=new Set();
+function at(ms,f){tos.add(setTimeout(f,ms))}
+function cancelAll(){rafs.forEach(cancelAnimationFrame);rafs.clear();tos.forEach(clearTimeout);tos.clear()}
+function txt(par,x,y,s,col=INK,size=26,anchor="middle",w=600){
+  const t=mk("text",{x,y,fill:col,"font-size":size,"text-anchor":anchor,"font-weight":w},par);t.textContent=s;return t;
+}
+function dot(par,p,col,r=5){return mk("circle",{cx:p.x,cy:p.y,r,fill:col},par)}
+function ticks(par,p,dir,count,col=INK,len=14,gap=7,w=2.6){
+  const pr={x:-dir.y,y:dir.x};
+  for(let i=0;i<count;i++){
+    const o=(i-(count-1)/2)*gap,c={x:p.x+dir.x*o,y:p.y+dir.y*o};
+    mk("line",{x1:c.x-pr.x*len/2,y1:c.y-pr.y*len/2,x2:c.x+pr.x*len/2,y2:c.y+pr.y*len/2,stroke:col,"stroke-width":w,"stroke-linecap":"round"},par);
+  }
+}
+function rightAngle(par,c,d1,d2,r=16,col=INK){
+  const p1={x:c.x+r*d1.x,y:c.y+r*d1.y},pm={x:c.x+r*(d1.x+d2.x),y:c.y+r*(d1.y+d2.y)},p2={x:c.x+r*d2.x,y:c.y+r*d2.y};
+  mk("polyline",{points:`${p1.x},${p1.y} ${pm.x},${pm.y} ${p2.x},${p2.y}`,fill:"none",stroke:col,"stroke-width":2.4,"stroke-linejoin":"miter"},par);
+}
+function coinL(par,c,d1,d2,off=10,len=14,col=INK){
+  /* moitié du signe + : un trait vers d1 et un trait vers d2, réunis dans le coin */
+  const q={x:c.x+off*(d1.x+d2.x),y:c.y+off*(d1.y+d2.y)};
+  const p1={x:q.x+len*d1.x,y:q.y+len*d1.y},p2={x:q.x+len*d2.x,y:q.y+len*d2.y};
+  mk("polyline",{points:`${p1.x},${p1.y} ${q.x},${q.y} ${p2.x},${p2.y}`,fill:"none",stroke:col,"stroke-width":2.8,"stroke-linejoin":"miter","stroke-linecap":"butt"},par);
+}
+function allAngles(par,c,u,n,r,col){
+  /* deux angles droits, de part et d'autre de la médiatrice */
+  const m=v=>({x:-v.x,y:-v.y});
+  rightAngle(par,c,u,n,r,col);rightAngle(par,c,n,m(u),r,col);
+}
+
+/* ---------- géométrie commune de l'angle ---------- */
+function baseAngle(O,TH0,H0,LEN,nameV){
+  const th=TH0*Math.PI/180,h=H0*Math.PI/180;
+  const v=a=>({x:Math.cos(a),y:Math.sin(a)});
+  const ax=v(th),ux=v(th-h),uy=v(th+h);
+  const at=(d,t)=>({x:O.x+d.x*t,y:O.y+d.y*t});
+  const X=at(ux,LEN),Y=at(uy,LEN);
+  mk("line",{x1:O.x,y1:O.y,x2:X.x,y2:X.y,stroke:INK,"stroke-width":3.5,"stroke-linecap":"round"});
+  mk("line",{x1:O.x,y1:O.y,x2:Y.x,y2:Y.y,stroke:INK,"stroke-width":3.5,"stroke-linecap":"round"});
+  const g=mk("g",{});
+  dot(g,O,5);txt(g,X.x+14,X.y-8,"x");txt(g,Y.x+16,Y.y+20,"y");txt(g,O.x-16,O.y+32,nameV);
+  const nU={x:ux.y,y:-ux.x},nL={x:-uy.y,y:uy.x};
+  const proj=(P,d)=>(P.x-O.x)*d.x+(P.y-O.y)*d.y;
+  const refl=P=>{const s=proj(P,ax);return {x:O.x+2*s*ax.x-(P.x-O.x),y:O.y+2*s*ax.y-(P.y-O.y)}};
+  return {O,th,h,v,ax,ux,uy,at,nU,nL,proj,refl,LEN};
+}
+function rtxt(par,p,deg,s,col,size){
+  const t=mk("text",{x:p.x,y:p.y,fill:col,"font-size":size,"font-weight":600,"text-anchor":"end",transform:`rotate(${deg} ${p.x} ${p.y})`},par);
+  t.textContent=s;return t;
+}
+function stxt(par,x,y,html,col,size,anchor="middle"){
+  const t=mk("text",{x,y,fill:col,"font-size":size,"font-weight":600,"text-anchor":anchor},par);
+  t.innerHTML=html;return t;
+}
+const sub=s=>s.replace(/([A-Z])(\d)/g,'$1<tspan baseline-shift="sub" font-size="70%">$2</tspan>');
+function arcPath(C,r,a1,a2){
+  const p=a=>({x:C.x+r*Math.cos(a),y:C.y+r*Math.sin(a)});
+  const p1=p(a1),p2=p(a2);
+  return `M${p1.x} ${p1.y}A${r} ${r} 0 0 1 ${p2.x} ${p2.y}`;
+}
+function grow(el,P,Q,a,dur,delay){
+  const set=t=>{el.setAttribute("x2",P.x+(Q.x-P.x)*t);el.setAttribute("y2",P.y+(Q.y-P.y)*t)};
+  el.style.transition="none";
+  if(!a){set(1);el.style.opacity=1;return}
+  set(0);el.style.opacity=1;
+  at(delay,()=>tween(dur,set));
+}
+
+/* ---------- Partie 1 : définition ---------- */
+function build1(){
+  svg.setAttribute("viewBox","0 0 900 430");
+  const g=baseAngle({x:190,y:150},10,22,480,"O");
+  const s0=g.at(g.ax,-70),s1=g.at(g.ax,520);
+  const bis=ghost(mk("line",{x1:s0.x,y1:s0.y,x2:s1.x,y2:s1.y,stroke:RED,"stroke-width":3.5,"stroke-linecap":"round"}));
+  const lab=ghost(mk("g",{}));
+  const n={x:g.ax.y,y:-g.ax.x},lp=g.at(g.ax,500);
+  rtxt(lab,{x:lp.x+n.x*14,y:lp.y+n.y*14},10,"bissectrice",RED,22);
+  const gA=ghost(mk("g",{}));
+  [[g.th-g.h,g.th],[g.th,g.th+g.h]].forEach(([a1,a2])=>{
+    mk("path",{d:arcPath(g.O,110,a1,a2),fill:"none",stroke:INK,"stroke-width":2.4},gA);
+    const m=(a1+a2)/2,pt={x:g.O.x+110*Math.cos(m),y:g.O.y+110*Math.sin(m)};
+    ticks(gA,pt,{x:-Math.sin(m),y:Math.cos(m)},1,INK,16,7,2.8);
+  });
+  return {steps:[
+    {hl:null,run(a){}},
+    {hl:"all",run(a){draw(bis,a,1200);fade(lab,a,500,a?1000:0);fade(gA,a,600,a?1200:0)}}
+  ]};
+}
+
+/* ---------- Partie 2 : égale distance des côtés ---------- */
+function build2(){
+  svg.setAttribute("viewBox","0 0 900 430");
+  const g=baseAngle({x:190,y:150},10,22,480,"O");
+  const s0=g.at(g.ax,-70),s1=g.at(g.ax,520);
+  const bis=ghost(mk("line",{x1:s0.x,y1:s0.y,x2:s1.x,y2:s1.y,stroke:RED,"stroke-width":3.5,"stroke-linecap":"round"}));
+  const lab=ghost(mk("g",{}));
+  const n={x:g.ax.y,y:-g.ax.x},lp=g.at(g.ax,500);
+  rtxt(lab,{x:lp.x+n.x*14,y:lp.y+n.y*14},10,"bissectrice",RED,22);
+  const defs=[{i:1,t:170,c:GREEN,tk:1},{i:2,t:340,c:OR,tk:2}];
+  const items=defs.map((q,k)=>{
+    const Pt=g.at(g.ax,q.t);
+    const Fu=g.at(g.ux,g.proj(Pt,g.ux)),Fl=g.at(g.uy,g.proj(Pt,g.uy));
+    const sa=ghost(mk("line",{x1:Pt.x,y1:Pt.y,x2:Fl.x,y2:Fl.y,stroke:q.c,"stroke-width":3,"stroke-linecap":"round"}));
+    const sb=ghost(mk("line",{x1:Pt.x,y1:Pt.y,x2:Fu.x,y2:Fu.y,stroke:q.c,"stroke-width":3,"stroke-linecap":"round"}));
+    const gp=ghost(mk("g",{}));dot(gp,Pt,6,q.c);
+    stxt(gp,Pt.x+14,Pt.y+36,sub("B"+q.i),q.c,26);
+    const gf=ghost(mk("g",{}));
+    dot(gf,Fu,3.5,q.c);dot(gf,Fl,3.5,q.c);
+    stxt(gf,Fu.x+g.nU.x*24,Fu.y+g.nU.y*24+8,sub("C"+q.i),q.c,24);
+    stxt(gf,Fl.x+g.nL.x*26,Fl.y+g.nL.y*26+8,sub("A"+q.i),q.c,24);
+    const un=(P,Q)=>{const l=Math.hypot(Q.x-P.x,Q.y-P.y);return {x:(Q.x-P.x)/l,y:(Q.y-P.y)/l}};
+    coinL(gf,Fu,g.ux,un(Fu,Pt),8,12,q.c);coinL(gf,Fl,g.uy,un(Fl,Pt),8,12,q.c);
+    const gt=ghost(mk("g",{}));
+    ticks(gt,{x:(Pt.x+Fu.x)/2,y:(Pt.y+Fu.y)/2},un(Pt,Fu),q.tk,q.c);
+    ticks(gt,{x:(Pt.x+Fl.x)/2,y:(Pt.y+Fl.y)/2},un(Pt,Fl),q.tk,q.c);
+    const eq=ghost(mk("g",{}));stxt(eq,670,330+k*50,sub(`B${q.i}A${q.i} = B${q.i}C${q.i}`),q.c,28,"start");
+    return {sa,sb,gp,gf,gt,eq};
+  });
+  const place=(it,a,d)=>{fade(it.gp,a,400,d);draw(it.sa,a,700,d+500);draw(it.sb,a,700,d+500);fade(it.gf,a,400,a?d+1200:0)};
+  const mark=(it,a,d)=>{fade(it.gt,a,400,d);fade(it.eq,a,400,d+200)};
+  return {steps:[
+    {hl:null,run(a){}},
+    {hl:"all",run(a){
+      draw(bis,a,1000,0);fade(lab,a,400,900);
+      place(items[0],a,1300);mark(items[0],a,2800);
+      place(items[1],a,3900);mark(items[1],a,5400);
+    }}
+  ]};
+}
+
+/* ---------- Partie 3 : axe de symétrie ---------- */
+function build3(){
+  svg.setAttribute("viewBox","0 0 900 430");
+  const g=baseAngle({x:190,y:150},10,22,480,"O");
+  const s0=g.at(g.ax,-70),s1=g.at(g.ax,520);
+  const bis=ghost(mk("line",{x1:s0.x,y1:s0.y,x2:s1.x,y2:s1.y,stroke:RED,"stroke-width":3.5,"stroke-linecap":"round"}));
+  const lab=ghost(mk("g",{}));
+  const n={x:g.ax.y,y:-g.ax.x},lp=g.at(g.ax,500);
+  rtxt(lab,{x:lp.x+n.x*14,y:lp.y+n.y*14},10,"axe de symétrie",RED,22);
+  const defs=[{k:"D",c:GREEN,side:"u",d:300,tk:1},{k:"E",c:OR,side:"l",d:200,tk:2}];
+  const un=(P,Q)=>{const l=Math.hypot(Q.x-P.x,Q.y-P.y);return {x:(Q.x-P.x)/l,y:(Q.y-P.y)/l}};
+  const items=defs.map(q=>{
+    const up=q.side==="u";
+    const P=g.at(up?g.ux:g.uy,q.d),P2=g.refl(P);
+    const H={x:(P.x+P2.x)/2,y:(P.y+P2.y)/2};
+    const dash=ghost(mk("line",{x1:P.x,y1:P.y,x2:P2.x,y2:P2.y,stroke:q.c,"stroke-width":2.8,"stroke-dasharray":"9 7","stroke-linecap":"round"}));
+    const gP=ghost(mk("g",{}));dot(gP,P,6,q.c);
+    const o1=up?g.nU:g.nL,o2=up?g.nL:g.nU;
+    txt(gP,P.x+o1.x*24,P.y+o1.y*24+8,q.k,q.c,26);
+    const gP2=ghost(mk("g",{}));dot(gP2,P2,6,q.c);
+    txt(gP2,P2.x+o2.x*26,P2.y+o2.y*26+8,q.k+"′",q.c,26);
+    const gM=ghost(mk("g",{}));
+    const pd=un(H,P);
+    coinL(gM,H,g.ax,pd,9,13);coinL(gM,H,g.ax,{x:-pd.x,y:-pd.y},9,13);
+    ticks(gM,{x:(P.x+H.x)/2,y:(P.y+H.y)/2},un(P,H),q.tk,q.c);
+    ticks(gM,{x:(P2.x+H.x)/2,y:(P2.y+H.y)/2},un(P2,H),q.tk,q.c);
+    return {P,P2,dash,gP,gP2,gM};
+  });
+  const seq=(it,a,t0)=>{
+    fade(it.gP,a,400,t0);
+    grow(it.dash,it.P,it.P2,a,1000,t0+500);
+    fade(it.gP2,a,400,a?t0+1550:0);
+    fade(it.gM,a,500,a?t0+2000:0);
+  };
+  return {steps:[
+    {hl:null,run(a){}},
+    {hl:"all",run(a){
+      draw(bis,a,1000,0);fade(lab,a,400,900);
+      seq(items[0],a,1300);seq(items[1],a,4400);
+    }}
+  ]};
+}
+
+/* ---------- Partie 4 : construction ---------- */
+function build4(){
+  svg.setAttribute("viewBox","0 0 900 450");
+  const g=baseAngle({x:150,y:205},8,22,440,"A");
+  const R=170,CY="#1a8fd0";
+  const M=g.at(g.ux,R),N=g.at(g.uy,R);
+  const B=g.at(g.ax,2*R*Math.cos(g.h));
+  const arcA=ghost(mk("path",{d:arcPath(g.O,R,g.th-g.h-.15,g.th+g.h+.15),fill:"none",stroke:CY,"stroke-width":2.8,"stroke-linecap":"round"}));
+  const aM=Math.atan2(B.y-M.y,B.x-M.x),aN=Math.atan2(B.y-N.y,B.x-N.x);
+  const arcM=ghost(mk("path",{d:arcPath(M,R,aM-.32,aM+.32),fill:"none",stroke:CY,"stroke-width":2.8,"stroke-linecap":"round"}));
+  const arcN=ghost(mk("path",{d:arcPath(N,R,aN-.32,aN+.32),fill:"none",stroke:CY,"stroke-width":2.8,"stroke-linecap":"round"}));
+  const gMN=ghost(mk("g",{}));
+  dot(gMN,M,4.5);dot(gMN,N,4.5);
+  txt(gMN,M.x+g.nU.x*22+6,M.y+g.nU.y*22+8,"M");txt(gMN,N.x+g.nL.x*26-8,N.y+g.nL.y*26+10,"N");
+  const gB=ghost(mk("g",{}));dot(gB,B,4.5);txt(gB,B.x+34,B.y-14,"B");
+  const e0=g.at(g.ax,-60),e1=g.at(g.ax,2*R*Math.cos(g.h)+130);
+  const red=ghost(mk("line",{x1:e0.x,y1:e0.y,x2:e1.x,y2:e1.y,stroke:RED,"stroke-width":3.5,"stroke-linecap":"round"}));
+  /* justification : le losange AMBN */
+  const quad=[[g.O,M],[M,B],[B,N],[N,g.O]];
+  const sides=quad.map(([P,Q])=>ghost(mk("line",{x1:P.x,y1:P.y,x2:Q.x,y2:Q.y,stroke:OR,"stroke-width":4,"stroke-linecap":"round"})));
+  const gTk=ghost(mk("g",{}));
+  quad.forEach(([P,Q])=>{const l=Math.hypot(Q.x-P.x,Q.y-P.y);ticks(gTk,{x:(P.x+Q.x)/2,y:(P.y+Q.y)/2},{x:(Q.x-P.x)/l,y:(Q.y-P.y)/l},1,OR,16,7,3)});
+  let shown=false;
+  const stepTxt=()=>scene.steps[3].txt;
+  const JTXT='<b class="etp" style="background:#e07b00">JUSTIFICATION</b>Les diagonales d’un losange coupent ses angles en deux angles isométriques.';
+  const swap=(html,delay)=>{const sp=$("stp");sp.style.transition="opacity .5s";sp.style.opacity=0;at(delay,()=>{sp.innerHTML=html;sp.style.opacity=1})};
+  jfn=()=>{
+    shown=!shown;
+    if(shown){sides.forEach((e,i)=>draw(e,true,500,i*450));fade(gTk,true,500,1900);swap(JTXT,2300)}
+    else{sides.forEach(e=>fadeOut(e,true));fadeOut(gTk,true);swap(stepTxt(),500)}
+  };
+  return {steps:[
+    {hl:null,run(a){}},
+    {hl:"verb",txt:'<b class="etp">ÉTAPE 1</b>Tracer un arc de cercle de centre A ; il coupe les côtés de l’angle xÂy aux points M et N.',run(a){draw(arcA,a,1300);fade(gMN,a,500,a?1400:0)}},
+    {hl:"verb",txt:'<b class="etp">ÉTAPE 2</b>Tracer deux arcs de cercle de même rayon, l’un de centre M et l’autre de centre N. Ces deux arcs se coupent en B.',run(a){draw(arcM,a,1100);draw(arcN,a,1100);fade(gB,a,500,a?1200:0)}},
+    {just:true,hl:"verb",txt:'<b class="etp">ÉTAPE 3</b>Tracer la droite qui passe par les points A et B. Cette droite est la bissectrice de l’angle xÂy.',run(a){draw(red,a,1000);if(a)at(1700,()=>showJust(true))}}
+  ]};
+}
+
+/* ---------- moteur ---------- */
+const parts=[
+  {tab:"1. Définition",lab:"Définition",n:2,build:build1,
+   html:'La bissectrice d’un angle est la droite qui <span class="hl" data-k="all">le partage en deux angles isométriques</span>.'},
+  {tab:"2. Égale distance",lab:"Propriété 1",n:2,build:build2,
+   html:'La bissectrice d’un angle est aussi l’<span class="hl" data-k="all">ensemble des points situés à égale distance des côtés de l’angle</span>.'},
+  {tab:"3. Axe de symétrie",lab:"Propriété 2",n:2,build:build3,
+   html:'La bissectrice d’un angle est aussi l’<span class="hl" data-k="all">axe de symétrie</span> de cet angle.'},
+  {tab:"4. Construction",lab:"Construction",n:4,build:build4,
+   html:'<span class="hl" data-k="verb">Construire</span> la bissectrice d’un angle.<div class="stp" id="stp"></div>'}
+];
+function showJust(v){$("bJust").style.display=v?"":"none"}
+function showCtl(v){$("ctl3").style.display=v?"flex":"none"}
+function setHL(k){const ks=Array.isArray(k)?k:(k?[k]:[]);document.querySelectorAll(".hl").forEach(h=>h.classList.toggle("on",ks.includes(h.dataset.k)))}
+let cur={p:0,s:0},scene=null;
+const $=id=>document.getElementById(id);
+$("tabs").innerHTML=parts.map((p,i)=>`<button class="tab" data-i="${i}">${p.tab}</button>`).join("");
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>go(+b.dataset.i,0,false));
+
+function go(p,s,anim){
+  cancelAll();ctl={};jfn=null;
+  svg.innerHTML="";
+  scene=parts[p].build();
+  for(let i=0;i<s;i++)scene.steps[i].run(false);
+  const stp=scene.steps[s];
+  stp.run(anim);
+  cur={p,s};
+  $("lab").textContent=parts[p].lab;
+  $("txt").innerHTML=parts[p].html;
+  if($("stp"))$("stp").innerHTML=stp.txt||"";
+  setHL(anim&&stp.hlAnim!==undefined?stp.hlAnim:stp.hl);
+  document.querySelectorAll(".tab").forEach((t,i)=>t.classList.toggle("on",i===p));
+  $("dots").innerHTML=Array.from({length:parts[p].n},(_,i)=>`<i class="${i<=s?"on":""} ${i===s?"cur":""}"></i>`).join("");
+  showCtl(!!stp.ctl&&!anim);showJust(!!stp.just&&!anim);
+  $("bPrev").style.visibility=(p===0&&s===0)?"hidden":"visible";
+  const last=(p===parts.length-1&&s===parts[p].n-1);
+  $("bNext").style.visibility=last?"hidden":"visible";
+}
+function next(){
+  const {p,s}=cur;
+  if(s<parts[p].n-1)go(p,s+1,true);else if(p<parts.length-1)go(p+1,0,false);
+}
+function prev(){
+  const {p,s}=cur;
+  if(s>0)go(p,s-1,false);else if(p>0)go(p-1,parts[p-1].n-1,false);
+}
+$("bJust").onclick=e=>{e.stopPropagation();if(jfn)jfn()};
+$("bNext").onclick=e=>{e.stopPropagation();next()};
+$("bPrev").onclick=e=>{e.stopPropagation();prev()};
+$("sw").onclick=next;
+document.addEventListener("keydown",e=>{
+  if(e.target&&e.target.tagName==="INPUT")return;
+  if(["ArrowRight","PageDown"," ","Enter"].includes(e.key)){e.preventDefault();next()}
+  else if(["ArrowLeft","PageUp","Backspace"].includes(e.key)){e.preventDefault();prev()}
+});
+go(0,0,false);
+</script>
+</body>
+</html>

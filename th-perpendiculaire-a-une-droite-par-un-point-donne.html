@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Perpendiculaire à une droite passant par un point donné</title>
+<style>
+:root{--cy:#0099b8;--box:#dbeaf6;--ink:#222}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:var(--ink);font-family:"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:10px 18px 14px}
+h1{margin:0 0 6px;font-size:28px;color:var(--cy);border-bottom:2px solid var(--cy);padding-bottom:6px;display:flex;align-items:center;gap:12px}
+.ring{display:inline-block;width:30px;height:30px;border:7px solid #bfe3ee;border-radius:50%;flex:none}
+.box{display:flex;gap:14px;align-items:stretch;margin:10px 0}
+.box .lab{color:var(--cy);font-weight:700;font-size:19px;width:120px;padding-top:12px;flex:none}
+.box .txt{background:var(--box);padding:10px 16px;font-size:20px;line-height:1.4;flex:1;border-radius:3px}
+.hl{border-radius:4px;padding:0 3px;transition:background .4s}
+.hl.on{background:#ffe680}
+#stp .st2{margin-top:8px}
+#stp{margin-top:10px;transition:opacity .5s}
+.etp{display:inline-block;background:#e07b00;color:#fff;font-size:14px;font-weight:800;padding:1px 8px;border-radius:3px;margin-right:10px;vertical-align:middle}
+.stagewrap{border:1px solid #cfe0ea;border-radius:8px;background:#fff;cursor:pointer}
+svg{display:block;width:100%;height:auto;max-height:calc(100vh - 305px);min-height:300px}
+svg text{font-family:"Segoe UI",Helvetica,Arial,sans-serif}
+button{font:inherit}
+.nb{border:2px solid var(--cy);background:#fff;color:var(--cy);border-radius:8px;padding:8px 18px;font-size:18px;font-weight:700;cursor:pointer}
+.nb:hover{background:#e6f6fa}
+.nb.go{background:var(--cy);color:#fff}
+.nb.go:hover{background:#007f9a}
+.nb.just{border-color:#e07b00;color:#c26400}
+.nb.just:hover{background:#fff3e0}
+.nav{display:flex;align-items:center;gap:12px;margin:0 0 10px}
+.dots{flex:1;display:flex;gap:7px;justify-content:center;flex-wrap:wrap}
+.dots i{width:12px;height:12px;border-radius:50%;background:#cfe6ee}
+.dots i.on{background:var(--cy)}
+.dots i.cur{box-shadow:0 0 0 3px #bfe3ee}
+@media(max-width:640px){
+ h1{font-size:22px}
+ .box{flex-direction:column;gap:4px}
+ .box .lab{width:auto;padding-top:0}
+ .box .txt{font-size:18px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <h1><span class="ring"></span>Perpendiculaire à une droite passant par un point donné</h1>
+ <div class="box"><div class="lab">Construction</div><div class="txt"><span class="hl" id="verb">Construire</span> la droite perpendiculaire à une droite d passant par un point A donné.<div id="stp"></div></div></div>
+ <div class="nav">
+  <button class="nb" id="bPrev">◀ Précédent</button>
+  <div class="dots" id="dots"></div>
+  <button class="nb go" id="bNext">Suivant ▶</button>
+ </div>
+ <div class="stagewrap" id="sw"><svg id="stage" viewBox="60 60 780 410"></svg></div>
+</div>
+<script>
+const NS="http://www.w3.org/2000/svg";
+const svg=document.getElementById("stage");
+const OR="#e07b00",RED="#d6232a",INK="#222",CY="#1a8fd0";
+const $=id=>document.getElementById(id);
+let rafs=new Set(),timers=[];
+
+/* ---------- outils SVG ---------- */
+function mk(tag,at,par){const e=document.createElementNS(NS,tag);for(const k in at)e.setAttribute(k,at[k]);(par||svg).appendChild(e);return e}
+function ghost(e){e.style.opacity=0;return e}
+function at(ms,f){timers.push(setTimeout(f,ms))}
+function cancelAll(){timers.forEach(clearTimeout);timers=[]}
+function fade(e,a,dur=500,delay=0){
+  e.style.transition="none";
+  if(!a){e.style.opacity=1;return}
+  e.style.opacity=0;void e.getBoundingClientRect();
+  e.style.transition=`opacity ${dur}ms ease ${delay}ms`;e.style.opacity=1;
+}
+function fadeOut(e,a){e.style.transition=a?"opacity 500ms ease":"none";e.style.opacity=0}
+function draw(e,a,dur=900,delay=0){
+  if(!a){e.style.transition="none";e.style.opacity=1;e.style.strokeDasharray="";return}
+  const L=e.getTotalLength();
+  e.style.transition="none";e.style.strokeDasharray=L;e.style.strokeDashoffset=L;e.style.opacity=1;
+  void e.getBoundingClientRect();
+  e.style.transition=`stroke-dashoffset ${dur}ms ease-in-out ${delay}ms`;e.style.strokeDashoffset=0;
+  at(dur+delay+60,()=>{e.style.strokeDasharray="";e.style.transition="none"});
+}
+function txt(par,x,y,s,col=INK,size=28,anchor="middle",w=600){
+  const t=mk("text",{x,y,fill:col,"font-size":size,"text-anchor":anchor,"font-weight":w,"font-style":"italic"},par);t.textContent=s;return t;
+}
+function dot(par,p,col=INK,r=5){return mk("circle",{cx:p.x,cy:p.y,r,fill:col},par)}
+function ticks(par,p,dir,count,col=INK,len=14,gap=7,w=2.6){
+  const pr={x:-dir.y,y:dir.x};
+  for(let i=0;i<count;i++){
+    const o=(i-(count-1)/2)*gap,c={x:p.x+dir.x*o,y:p.y+dir.y*o};
+    mk("line",{x1:c.x-pr.x*len/2,y1:c.y-pr.y*len/2,x2:c.x+pr.x*len/2,y2:c.y+pr.y*len/2,stroke:col,"stroke-width":w,"stroke-linecap":"round"},par);
+  }
+}
+function coinL(par,c,d1,d2,off=9,len=13,w=2.6,col=INK){
+  const q={x:c.x+off*(d1.x+d2.x),y:c.y+off*(d1.y+d2.y)};
+  const p1={x:q.x+len*d1.x,y:q.y+len*d1.y},p2={x:q.x+len*d2.x,y:q.y+len*d2.y};
+  mk("polyline",{points:`${p1.x},${p1.y} ${q.x},${q.y} ${p2.x},${p2.y}`,fill:"none",stroke:col,"stroke-width":w},par);
+}
+function arcPath(C,r,a1,a2){
+  const p=a=>({x:C.x+r*Math.cos(a),y:C.y+r*Math.sin(a)});
+  const p1=p(a1),p2=p(a2);
+  return `M${p1.x} ${p1.y}A${r} ${r} 0 ${Math.abs(a2-a1)>Math.PI?1:0} 1 ${p2.x} ${p2.y}`;
+}
+
+/* ---------- géométrie ---------- */
+const th=10*Math.PI/180;
+const u={x:Math.cos(th),y:-Math.sin(th)};          // direction de d
+const nd={x:Math.sin(th),y:Math.cos(th)};          // normale vers le bas
+const up={x:-nd.x,y:-nd.y};
+const H={x:450,y:262},h=140,r=205;
+const hB=90;
+const A={x:H.x+up.x*h,y:H.y+up.y*h},B={x:H.x+nd.x*hB,y:H.y+nd.y*hB};
+const k=Math.sqrt(r*r-h*h);
+const r2=Math.hypot(k,hB);   // rayon des arcs de centres M et N : plus petit, ne passe pas par A
+const M={x:H.x-k*u.x,y:H.y-k*u.y},N={x:H.x+k*u.x,y:H.y+k*u.y};
+const D0={x:H.x-380*u.x,y:H.y-380*u.y},D1={x:H.x+380*u.x,y:H.y+380*u.y};
+const ang=(C,P)=>Math.atan2(P.y-C.y,P.x-C.x);
+
+/* ---------- construction ---------- */
+function build(){
+  svg.innerHTML="";
+  mk("line",{x1:D0.x,y1:D0.y,x2:D1.x,y2:D1.y,stroke:INK,"stroke-width":3.5,"stroke-linecap":"round"});
+  txt(svg,D1.x-6,D1.y-24,"d");
+  const gA=mk("g",{});dot(gA,A);txt(gA,A.x-24,A.y-8,"A");
+  const aM=ang(A,M),aN=ang(A,N);
+  const arcA=ghost(mk("path",{d:arcPath(A,r,Math.min(aM,aN)-.2,Math.max(aM,aN)+.2),fill:"none",stroke:CY,"stroke-width":2.8,"stroke-linecap":"round"}));
+  const gMN=ghost(mk("g",{}));
+  dot(gMN,M,INK,4.5);dot(gMN,N,INK,4.5);
+  txt(gMN,M.x-4,M.y+34,"M");txt(gMN,N.x+4,N.y+34,"N");
+  const Q={x:H.x+up.x*hB,y:H.y+up.y*hB};
+  const mP=ang(M,B),mQ=ang(M,Q);
+  let nP=ang(N,B),nQ=ang(N,Q);if(nQ<0)nQ+=2*Math.PI;
+  const arcM=ghost(mk("path",{d:arcPath(M,r2,mQ-.3,mP+.3),fill:"none",stroke:CY,"stroke-width":2.8,"stroke-linecap":"round"}));
+  const arcN=ghost(mk("path",{d:arcPath(N,r2,nP-.3,nQ+.3),fill:"none",stroke:CY,"stroke-width":2.8,"stroke-linecap":"round"}));
+  const gB=ghost(mk("g",{}));dot(gB,B,INK,4.5);dot(gB,Q,INK,4.5);txt(gB,B.x+26,B.y+12,"P");txt(gB,Q.x+26,Q.y-4,"Q");
+  const e0={x:A.x+up.x*45,y:A.y+up.y*45},e1={x:B.x+nd.x*55,y:B.y+nd.y*55};
+  const red=ghost(mk("line",{x1:e0.x,y1:e0.y,x2:e1.x,y2:e1.y,stroke:RED,"stroke-width":3.5,"stroke-linecap":"round"}));
+  const gAng=ghost(mk("g",{}));
+  coinL(gAng,H,u,up);coinL(gAng,H,up,{x:-u.x,y:-u.y});
+  [gA,gMN,gB,gAng].forEach(g=>svg.appendChild(g));
+  const steps=[
+    {run(a){}},
+    {txt:'<b class="etp">ÉTAPE 1</b>Tracer un arc de cercle de centre A qui coupe la droite d en deux points.',
+     run(a){draw(arcA,a,1300);fade(gMN,a,500,a?1400:0)}},
+    {txt:'<b class="etp">ÉTAPE 2</b>Tracer la médiatrice de MN : deux arcs de cercle de même rayon, centrés en M et N, se coupent en deux points P et Q.',
+     run(a){draw(arcM,a,1100);draw(arcN,a,1100);fade(gB,a,500,a?1200:0)}},
+    {txt:'<b class="etp">ÉTAPE 3</b>La médiatrice de MN passe par A, car MA = NA.<div class="st2"><b class="etp">JUSTIFICATION</b>La médiatrice est perpendiculaire à d.</div>',
+     run(a){draw(red,a,1100);fade(gAng,a,500,a?1200:0)}}
+  ];
+  return {steps};
+}
+
+/* ---------- navigation ---------- */
+let scene=null,cur=0;
+function go(s,anim){
+  cancelAll();
+  scene=build();
+  for(let i=0;i<=s;i++){ if(i<s) scene.steps[i].run(false); }
+  scene.steps[s].run(anim);
+  cur=s;
+  const sp=$("stp");sp.style.transition="none";sp.style.opacity=1;sp.innerHTML=scene.steps[s].txt||"";
+  $("verb").classList.toggle("on",s>=1);
+  $("dots").innerHTML=scene.steps.map((_,i)=>`<i class="${i<=s?"on":""} ${i===s?"cur":""}"></i>`).join("");
+  $("bPrev").style.visibility=s===0?"hidden":"visible";
+  $("bNext").style.visibility=s===scene.steps.length-1?"hidden":"visible";
+}
+const next=()=>{if(cur<scene.steps.length-1)go(cur+1,true)};
+const prev=()=>{if(cur>0)go(cur-1,false)};
+$("bNext").onclick=e=>{e.stopPropagation();next()};
+$("bPrev").onclick=e=>{e.stopPropagation();prev()};
+$("sw").onclick=next;
+document.addEventListener("keydown",e=>{
+  if(["ArrowRight","PageDown"," ","Enter"].includes(e.key)){e.preventDefault();next()}
+  else if(["ArrowLeft","PageUp","Backspace"].includes(e.key)){e.preventDefault();prev()}
+});
+go(0,false);
+</script>
+</body>
+</html>

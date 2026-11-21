@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ES20 À partir de 60°</title>
+<style>
+:root{--cy:#0099b8;--box:#dbeaf6;--ink:#222}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:var(--ink);font-family:"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:1400px;margin:0 auto;padding:10px 16px 14px}
+h1{margin:0 0 8px;color:var(--cy);font-size:32px;display:flex;align-items:center;gap:12px;border-bottom:3px solid var(--cy);padding-bottom:6px}
+h1 .es{background:var(--cy);color:#fff;font-size:24px;padding:2px 10px;border-radius:3px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.tab{border:2px solid var(--cy);background:#fff;color:var(--cy);border-radius:20px;padding:5px 16px;font-size:17px;cursor:pointer;font-weight:600;font-family:inherit}
+.tab.on{background:var(--cy);color:#fff}
+.box{background:var(--box);padding:10px 16px;font-size:20px;line-height:1.5;border-radius:3px;margin:8px 0}
+.box .it{margin-left:14px;white-space:nowrap;font-weight:700}
+.hl{border-radius:4px;padding:0 4px;transition:background .4s}
+.hl.on{background:#ffe680}
+.nav{display:flex;align-items:center;gap:12px;margin:0 0 8px}
+.nb{font:inherit;border:2px solid var(--cy);background:#fff;color:var(--cy);border-radius:8px;padding:7px 18px;font-size:18px;font-weight:700;cursor:pointer}
+.nb:hover{background:#e6f6fa}
+.nb.alt{border-color:#e07b00;color:#c26400}
+.nb.alt:hover{background:#fff3e0}
+.nb.go{background:var(--cy);color:#fff}
+.nb.go:hover{background:#007f9a}
+.dots{flex:1;display:flex;gap:7px;justify-content:center;flex-wrap:wrap}
+.dots i{width:12px;height:12px;border-radius:50%;background:#cfe6ee}
+.dots i.on{background:var(--cy)}
+.dots i.cur{box-shadow:0 0 0 3px #bfe3ee}
+.main{display:block}
+.stagewrap{border:1px solid #cfe0ea;border-radius:8px;background:#fff;cursor:pointer}
+svg{display:block;width:100%;height:auto;max-height:calc(100vh - 190px);min-height:300px}
+svg text{font-family:"Segoe UI",Helvetica,Arial,sans-serif}
+.panel h2{margin:0 0 8px;font-size:19px;color:var(--cy)}
+.ln{border-left:7px solid;border-radius:4px;padding:6px 10px;margin:0 0 6px;font-size:16.5px;line-height:1.35;transition:opacity .5s}
+.ln .n{display:inline-block;color:#fff;font-weight:700;font-size:14px;padding:0 7px;border-radius:3px;margin-right:8px}
+.ln .fo{margin-top:3px;font-weight:700;font-size:19px;color:#0b4a5c}
+@media(max-width:860px){.main{grid-template-columns:1fr}h1{font-size:24px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <h1><span class="es">ES20</span>À partir de 60°</h1>
+ <div class="tabs" id="tabs"></div>
+ <div class="nav">
+  <button class="nb" id="bPrev">◀ Précédent</button>
+  <button class="nb alt" id="bAlt" style="display:none">Autre solution</button>
+  <div class="dots" id="dots"></div>
+  <button class="nb go" id="bNext">Suivant ▶</button>
+ </div>
+ <div class="main">
+  <div class="stagewrap" id="sw"><svg id="stage" viewBox="0 0 830 560"></svg></div>
+ </div>
+</div>
+<script>
+const NS="http://www.w3.org/2000/svg";
+const svg=document.getElementById("stage");
+const $=id=>document.getElementById(id);
+const INK="#222",RED="#d6232a",DRED="#a5121a";
+let rafs=new Set(),tos=new Set();
+function mk(tag,at,par){const e=document.createElementNS(NS,tag);for(const k in at)e.setAttribute(k,at[k]);(par||svg).appendChild(e);return e}
+function ghost(e){e.style.opacity=0;return e}
+function fade(e,a,dur=500,delay=0){
+  e.style.transition="none";
+  if(!a){e.style.opacity=1;return}
+  e.style.opacity=0;void e.getBoundingClientRect();
+  e.style.transition=`opacity ${dur}ms ease ${delay}ms`;e.style.opacity=1;
+}
+function draw(e,a,dur=900,delay=0){
+  if(!a){e.style.transition="none";e.style.opacity=1;e.style.strokeDasharray="";return}
+  const L=e.getTotalLength();
+  e.style.transition="none";e.style.strokeDasharray=L;e.style.strokeDashoffset=L;e.style.opacity=1;
+  void e.getBoundingClientRect();
+  e.style.transition=`stroke-dashoffset ${dur}ms ease-in-out ${delay}ms`;e.style.strokeDashoffset=0;
+  tos.add(setTimeout(()=>{e.style.strokeDasharray="";e.style.transition="none"},dur+delay+60));
+}
+function at(ms,f){tos.add(setTimeout(f,ms))}
+function cancelAll(){rafs.forEach(cancelAnimationFrame);rafs.clear();tos.forEach(clearTimeout);tos.clear()}
+function txt(par,x,y,s,col=INK,size=26,anchor="middle",w=600){
+  const t=mk("text",{x,y,fill:col,"font-size":size,"text-anchor":anchor,"font-weight":w},par);t.textContent=s;return t;
+}
+function dot(par,p,col,r=5){return mk("circle",{cx:p.x,cy:p.y,r,fill:col},par)}
+
+/* ---------- géométrie ---------- */
+const O={x:320,y:300},R0=115,R2=115,WR=72,LB=250,AL=440;
+const rad=d=>d*Math.PI/180;
+const P=(t,r=R0,C=O)=>({x:C.x+r*Math.cos(rad(t)),y:C.y-r*Math.sin(rad(t))});
+function arcD(C,r,t1,t2){
+  const p1=P(t1,r,C),p2=P(t2,r,C);
+  return `M${p1.x} ${p1.y}A${r} ${r} 0 ${Math.abs(t2-t1)>180?1:0} 0 ${p2.x} ${p2.y}`;
+}
+function wedgeD(t1,t2,r){
+  const p1=P(t1,r),p2=P(t2,r);
+  return `M${O.x} ${O.y}L${p1.x} ${p1.y}A${r} ${r} 0 ${t2-t1>180?1:0} 0 ${p2.x} ${p2.y}Z`;
+}
+const pathEl=(d,col,w=3.2)=>ghost(mk("path",{d,fill:"none",stroke:col,"stroke-width":w,"stroke-linecap":"round"}));
+function ptAt(name,p,t,col){
+  const g=ghost(mk("g",{}));
+  dot(g,p,col,5.5);
+  const u={x:Math.cos(rad(t)),y:-Math.sin(rad(t))},n={x:-u.y,y:u.x};
+  const o=name==="M"?34:26;txt(g,p.x+n.x*o,p.y+n.y*o+8,name,col,26);
+  return g;
+}
+function wedgeG(t1,t2,r,fill,col,label,lr){
+  const g=ghost(mk("g",{}));
+  mk("path",{d:wedgeD(t1,t2,r),fill,"fill-opacity":.7,stroke:col,"stroke-width":2},g);
+  const lp=P((t1+t2)/2,lr);
+  txt(g,lp.x,lp.y+8,label,DRED,22,"middle",700);
+  return g;
+}
+const dirPhi=(Cc,Q)=>Math.atan2(-(Q.y-Cc.y),Q.x-Cc.x)*180/Math.PI;
+const lrFor=(span,r)=>span<=30?r+26:(span<=60?r*0.62:r*0.58);
+
+/* ---------- lignes de la marche à suivre ---------- */
+const COL={
+  blue:["#1f5fbf","#dce8fa"],or:["#e07b00","#fde7c8"],gr:["#1a9a55","#d5f0e0"],
+  vio:["#7a3bbf","#eadcf8"],teal:["#0099b8","#d4eff6"],mag:["#c2185b","#f9d7e5"],red:[RED,"#fbd9db"]
+};
+function lnArcO(c,maxT){
+  const arc=pathEl(arcD(O,R0,-10,maxT),c[0]),p=ptAt("P",P(0),0,c[0]);
+  return {c,txt:"Tracer un arc de cercle de centre O ; il coupe la demi-droite [OA) en P.",dur:1900,
+    run(a,t0){draw(arc,a,1300,t0);fade(p,a,400,t0+1400)}};
+}
+function lnCross(c,fromT,toT,fromN,toN){
+  const Cc=P(fromT),Pn=P(toT),phi=dirPhi(Cc,Pn);
+  const arc=pathEl(arcD(Cc,R0,phi-20,phi+20),c[0]),p=ptAt(toN,Pn,toT,c[0]);
+  const E=P(toT,190),ds=ghost(mk("line",{x1:O.x,y1:O.y,x2:E.x,y2:E.y,stroke:c[0],"stroke-width":2.2,"stroke-dasharray":"9 7","stroke-linecap":"round"}));
+  return {c,txt:`Tracer un arc de cercle de même rayon, de centre ${fromN} ; il coupe le premier arc en ${toN}.`,dur:1500,
+    run(a,t0){draw(arc,a,900,t0);fade(p,a,400,t0+950);fade(ds,a,600,t0+1000)}};
+}
+function lnBis(c,aT,bT,aN,bN){
+  const h=(bT-aT)/2,m=(aT+bT)/2;
+  const dM=R0*Math.cos(rad(h))+Math.sqrt(R2*R2-Math.pow(R0*Math.sin(rad(h)),2));
+  const Mp=P(m,dM);
+  const arcs=[aT,bT].map(t=>{const Cc=P(t);const phi=dirPhi(Cc,Mp);return pathEl(arcD(Cc,R2,phi-17,phi+17),c[0])});
+  const p=ptAt("M",Mp,m,c[0]);
+  return {c,txt:`Tracer deux arcs de cercle de même rayon, l’un de centre ${aN} et l’autre de centre ${bN}. Ces deux arcs se coupent en M.`,dur:1600,
+    run(a,t0){arcs.forEach(e=>draw(e,a,900,t0));fade(p,a,400,t0+950)}};
+}
+function lnProlong(c){
+  const S=P(180),E=P(180,235);
+  const ln=ghost(mk("line",{x1:O.x,y1:O.y,x2:E.x,y2:E.y,stroke:c[0],"stroke-width":3,"stroke-dasharray":"10 7","stroke-linecap":"round"}));
+  const p=ptAt("S",S,180,c[0]);
+  return {c,txt:"Prolonger la demi-droite [OA) ; elle coupe le premier arc en S.",dur:1500,
+    run(a,t0){fade(ln,a,700,t0);fade(p,a,400,t0+700)}};
+}
+function lnRay(c,T,mName,f,extra){
+  const E=P(T,LB),Lb=P(T,LB+26);
+  const ray=ghost(mk("line",{x1:O.x,y1:O.y,x2:E.x,y2:E.y,stroke:RED,"stroke-width":3.8,"stroke-linecap":"round"}));
+  const gB=ghost(mk("g",{}));dot(gB,E,RED,5);txt(gB,Lb.x,Lb.y+9,"B",RED,26);
+  const w=wedgeG(0,T,WR,"#bfe3f3","#0099b8",T+"°",lrFor(T,WR));
+  const ex=extra?extra():null;
+  return {c,txt:`Tracer la demi-droite [OB) qui passe par ${mName}.`,f,dur:1800,
+    run(a,t0){draw(ray,a,900,t0);fade(gB,a,400,t0+900);fade(w,a,600,t0+1000);if(ex)fade(ex,a,600,t0+1000)}};
+}
+function lnWedge(c,t1,t2,lab,text,f,ext){
+  const w=wedgeG(t1,t2,52,"#f3b8d2",c[0],lab,ext?92:lrFor(t2-t1,52));
+  let dash=null,S=null;
+  if(ext){const E=P(180,235);dash=ghost(mk("line",{x1:O.x,y1:O.y,x2:E.x,y2:E.y,stroke:c[0],"stroke-width":3,"stroke-dasharray":"10 7","stroke-linecap":"round"}))}
+  return {c,txt:text,f,dur:1500,run(a,t0){if(dash)fade(dash,a,600,t0);fade(w,a,600,t0+(dash?500:0))}};
+}
+
+/* ---------- les six exercices ---------- */
+const LET=[
+ {k:"a",lab:"a) 60°",build:()=>[
+   [lnArcO(COL.blue,75),lnCross(COL.or,0,60,"P","Q")],
+   [lnRay(COL.red,60,"Q","Triangle équilatéral",()=>{
+      const g=ghost(mk("g",{})),a=P(0),b=P(60);
+      mk("line",{x1:a.x,y1:a.y,x2:b.x,y2:b.y,stroke:"#777","stroke-width":2.4,"stroke-dasharray":"7 6"},g);return g})]
+ ]},
+ {k:"b",lab:"b) 120°",build:()=>[
+   [lnArcO(COL.blue,135),lnCross(COL.or,0,60,"P","Q")],
+   [lnCross(COL.gr,60,120,"Q","R")],
+   [lnRay(COL.red,120,"R","120° = 60° + 60°")]
+ ]},
+ {k:"c",lab:"c) 30°",build:()=>[
+   [lnArcO(COL.blue,75),lnCross(COL.or,0,60,"P","Q")],
+   [lnBis(COL.gr,0,60,"P","Q")],
+   [lnRay(COL.red,30,"M","30° = 60° / 2")]
+ ]},
+ {k:"d",lab:"d) 90°",build:()=>[
+   [lnArcO(COL.blue,135),lnCross(COL.or,0,60,"P","Q")],
+   [lnCross(COL.gr,60,120,"Q","R")],
+   [lnBis(COL.vio,60,120,"Q","R")],
+   [lnRay(COL.red,90,"M","90° = 60° + 30°")]
+ ]},
+ {k:"e",lab:"e) 150°",build:()=>[
+   [lnArcO(COL.blue,195),lnCross(COL.or,0,60,"P","Q")],
+   [lnCross(COL.gr,60,120,"Q","R")],
+   [lnProlong(COL.vio)],
+   [lnBis(COL.teal,120,180,"R","S")],
+   [lnRay(COL.red,150,"M","150° = 120° + 30°")]
+ ]},
+ {k:"f",lab:"f) 240°",build:()=>[
+   [lnArcO(COL.blue,255),lnCross(COL.or,0,60,"P","Q")],
+   [lnCross(COL.gr,60,120,"Q","R")],
+   [lnCross(COL.vio,120,180,"R","S")],
+   [lnCross(COL.teal,180,240,"S","T")],
+   [lnRay(COL.red,240,"T","240° = 4·60°")]
+ ]}
+];
+
+/* ---------- moteur ---------- */
+let cur={p:0,s:0},groups=[];
+$("tabs").innerHTML=LET.map((l,i)=>`<button class="tab" data-i="${i}">${l.lab}</button>`).join("");
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>go(+b.dataset.i,0,false));
+
+function base(){
+  const A={x:O.x+AL,y:O.y};
+  mk("line",{x1:O.x,y1:O.y,x2:A.x,y2:A.y,stroke:INK,"stroke-width":3.8,"stroke-linecap":"round"});
+  const g=mk("g",{});dot(g,O,INK,5.5);dot(g,A,INK,5.5);
+  txt(g,O.x-18,O.y+32,"O");txt(g,A.x+4,A.y+34,"A");
+}
+let fN=0;
+function addLine(l,k,anim){
+  if(!l.f)return;
+  const t=mk("text",{x:520,y:120+fN*52,fill:"#0b4a5c","font-size":32,"font-weight":700},svg);
+  t.textContent=l.f;fN++;
+  if(anim){t.style.opacity=0;void t.getBoundingClientRect();t.style.transition="opacity .6s";t.style.opacity=1}
+}
+function runGroup(g,anim,t0){
+  let t=t0;
+  g.forEach(l=>{l.run(anim,t);if(anim){const tt=t;at(tt,()=>addLine(l,0,true))}else addLine(l,0,false);t+=l.dur});
+  return t;
+}
+function go(p,s,anim,alt){
+  cancelAll();svg.innerHTML="";fN=0;
+  base();
+  groups=LET[p].build();
+  const hasAlt=!!LET[p].alt;
+  const main=hasAlt?groups.slice(0,-1):groups,altG=hasAlt?groups[groups.length-1]:null;
+  let end=0;
+  if(s>=1){
+    let t=0;
+    main.forEach(g=>{t=runGroup(g,anim,t)});
+    end=t;
+    if(alt&&altG)runGroup(altG,false,0);
+  }else if(altG){/* éléments de la 2e solution créés mais invisibles */}
+  cur={p,s,alt:!!alt};
+  document.querySelectorAll(".tab").forEach((t,i)=>t.classList.toggle("on",i===p));
+  const n=hasAlt?3:2,di=s===0?0:(alt?2:1);
+  $("dots").innerHTML=Array.from({length:n},(_,i)=>`<i class="${i<=di?"on":""} ${i===di?"cur":""}"></i>`).join("");
+  $("bPrev").style.visibility=(p===0&&s===0)?"hidden":"visible";
+  const last=(p===LET.length-1&&s===1&&(!hasAlt||alt));
+  $("bNext").style.visibility=last?"hidden":"visible";
+  const ba=$("bAlt");ba.style.display="none";
+  if(hasAlt&&s===1&&!alt){at(anim?end+300:0,()=>{ba.style.display=""})}
+}
+function showAlt(){
+  const {p,s,alt}=cur;
+  if(alt||s!==1||!LET[p].alt)return;
+  const g=groups[groups.length-1];
+  runGroup(g,true,0);
+  cur.alt=true;$("bAlt").style.display="none";
+  $("dots").innerHTML=Array.from({length:3},(_,i)=>`<i class="on ${i===2?"cur":""}"></i>`).join("");
+  $("bNext").style.visibility=(cur.p===LET.length-1)?"hidden":"visible";
+}
+function next(){
+  const {p,s}=cur;
+  if(s===0)go(p,1,true,false);else if(p<LET.length-1)go(p+1,0,false,false);
+}
+function prev(){
+  const {p,s,alt}=cur;
+  if(s===1&&alt)go(p,1,false,false);
+  else if(s===1)go(p,0,false,false);
+  else if(p>0)go(p-1,1,false,!!LET[p-1].alt);
+}
+$("bNext").onclick=e=>{e.stopPropagation();next()};
+$("bPrev").onclick=e=>{e.stopPropagation();prev()};
+$("bAlt").onclick=e=>{e.stopPropagation();showAlt()};
+$("sw").onclick=next;
+document.addEventListener("keydown",e=>{
+  if(["ArrowRight","PageDown"," ","Enter"].includes(e.key)){e.preventDefault();next()}
+  else if(["ArrowLeft","PageUp","Backspace"].includes(e.key)){e.preventDefault();prev()}
+});
+go(0,0,false,false);
+</script>
+</body>
+</html>

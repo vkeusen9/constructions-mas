@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Médiatrice d’un segment</title>
+<style>
+:root{--cy:#0099b8;--box:#dbeaf6;--red:#d6232a;--ink:#222}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:var(--ink);font-family:"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:1000px;margin:0 auto;padding:10px 16px 14px}
+h1{margin:0 0 8px;color:var(--cy);font-size:34px;display:flex;align-items:center;gap:12px;border-bottom:3px solid var(--cy);padding-bottom:6px}
+h1 .ring{width:34px;height:34px;border:7px solid #bfe3ee;border-radius:50%;flex:none}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.tab{border:2px solid var(--cy);background:#fff;color:var(--cy);border-radius:20px;padding:6px 14px;font-size:16px;cursor:pointer;font-weight:600}
+.tab.on{background:var(--cy);color:#fff}
+.box{display:flex;gap:14px;align-items:stretch;margin:10px 0}
+.box .lab{color:var(--cy);font-weight:700;font-size:19px;width:120px;padding-top:12px;flex:none}
+.box .txt{background:var(--box);padding:12px 16px;font-size:22px;line-height:1.4;flex:1;border-radius:3px}
+.stp{margin-top:8px;min-height:66px;font-size:21px;color:#0b4a5c;line-height:1.45}
+.etp{display:inline-block;background:#0099b8;color:#fff;font-size:13px;font-weight:700;padding:1px 7px;border-radius:3px;margin-right:8px;vertical-align:middle}
+.hl{border-radius:4px;padding:0 3px;transition:background .4s}
+.hl.on{background:#ffe680}
+.stagewrap{border:1px solid #cfe0ea;border-radius:8px;background:#fff;cursor:pointer}
+svg{display:block;width:100%;height:auto;max-height:calc(100vh - 345px);min-height:300px}
+svg text{font-family:"Segoe UI",Helvetica,Arial,sans-serif}
+#ctl3{display:none;align-items:center;gap:10px;margin:4px 0 8px;flex-wrap:wrap}
+#ctl3 input{flex:1;min-width:180px}
+button{font:inherit}
+.nb{border:2px solid var(--cy);background:#fff;color:var(--cy);border-radius:8px;padding:8px 18px;font-size:18px;font-weight:700;cursor:pointer}
+.nb:hover{background:#e6f6fa}
+.nb.just{border-color:#e07b00;color:#c26400}
+.nb.just:hover{background:#fff3e0}
+.nb.go{background:var(--cy);color:#fff}
+.nb.go:hover{background:#007f9a}
+.nav{display:flex;align-items:center;gap:12px;margin:0 0 10px}
+.dots{flex:1;display:flex;gap:7px;justify-content:center;flex-wrap:wrap}
+.dots i{width:12px;height:12px;border-radius:50%;background:#cfe6ee}
+.dots i.on{background:var(--cy)}
+.dots i.cur{box-shadow:0 0 0 3px #bfe3ee}
+@media(max-width:640px){
+ h1{font-size:25px}
+ .box{flex-direction:column;gap:4px}
+ .box .lab{width:auto;padding-top:0}
+ .box .txt{font-size:18px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <h1><span class="ring"></span>Médiatrice d’un segment</h1>
+ <div class="tabs" id="tabs"></div>
+ <div class="box"><div class="lab" id="lab"></div><div class="txt" id="txt"></div></div>
+ <div class="nav">
+  <button class="nb" id="bPrev">◀ Précédent</button>
+  <button class="nb just" id="bJust" style="display:none">Justification</button>
+  <div class="dots" id="dots"></div>
+  <button class="nb go" id="bNext">Suivant ▶</button>
+ </div>
+ <div id="ctl3">
+  <button class="nb" id="bPause" onclick="ctl.pause()">Pause</button>
+  <button class="nb" id="bReplay" onclick="ctl.replay()">Rejouer</button>
+  <input type="range" id="slider" min="0" max="1000" value="0" aria-label="Position de l’axe de symétrie">
+ </div>
+ <div class="stagewrap" id="sw"><svg id="stage" viewBox="0 0 900 430"></svg></div>
+</div>
+
+<script>
+const NS="http://www.w3.org/2000/svg";
+const svg=document.getElementById("stage");
+const BLUE="#1f5fbf",OR="#e07b00",RED="#d6232a",GREEN="#1a9a55",VIO="#7a3bbf",INK="#222";
+let rafs=new Set();
+let ctl={};
+let jfn=null;
+
+/* ---------- outils SVG ---------- */
+function mk(tag,at,par){const e=document.createElementNS(NS,tag);for(const k in at)e.setAttribute(k,at[k]);(par||svg).appendChild(e);return e}
+function ghost(e){e.style.opacity=0;return e}
+function fade(e,a,dur=500,delay=0){
+  e.style.transition="none";
+  if(!a){e.style.opacity=1;return}
+  e.style.opacity=0;void e.getBoundingClientRect();
+  e.style.transition=`opacity ${dur}ms ease ${delay}ms`;e.style.opacity=1;
+}
+function fadeOut(e,a){e.style.transition=a?"opacity 500ms ease":"none";e.style.opacity=0}
+function draw(e,a,dur=900,delay=0){
+  if(!a){e.style.transition="none";e.style.opacity=1;e.style.strokeDasharray="";return}
+  const L=e.getTotalLength();
+  e.style.transition="none";e.style.strokeDasharray=L;e.style.strokeDashoffset=L;e.style.opacity=1;
+  void e.getBoundingClientRect();
+  e.style.transition=`stroke-dashoffset ${dur}ms ease-in-out ${delay}ms`;e.style.strokeDashoffset=0;
+  setTimeout(()=>{e.style.strokeDasharray="";e.style.transition="none"},dur+delay+60);
+}
+function tween(dur,f,done){
+  const t0=performance.now();
+  const step=now=>{const t=Math.min(1,(now-t0)/dur);f(t);if(t<1){rafs.add(requestAnimationFrame(step))}else if(done)done()};
+  rafs.add(requestAnimationFrame(step));
+}
+const tos=new Set();
+function at(ms,f){tos.add(setTimeout(f,ms))}
+function cancelAll(){rafs.forEach(cancelAnimationFrame);rafs.clear();tos.forEach(clearTimeout);tos.clear()}
+function txt(par,x,y,s,col=INK,size=26,anchor="middle",w=600){
+  const t=mk("text",{x,y,fill:col,"font-size":size,"text-anchor":anchor,"font-weight":w},par);t.textContent=s;return t;
+}
+function dot(par,p,col,r=5){return mk("circle",{cx:p.x,cy:p.y,r,fill:col},par)}
+function ticks(par,p,dir,count,col=INK,len=14,gap=7,w=2.6){
+  const pr={x:-dir.y,y:dir.x};
+  for(let i=0;i<count;i++){
+    const o=(i-(count-1)/2)*gap,c={x:p.x+dir.x*o,y:p.y+dir.y*o};
+    mk("line",{x1:c.x-pr.x*len/2,y1:c.y-pr.y*len/2,x2:c.x+pr.x*len/2,y2:c.y+pr.y*len/2,stroke:col,"stroke-width":w,"stroke-linecap":"round"},par);
+  }
+}
+function rightAngle(par,c,d1,d2,r=16,col=INK){
+  const p1={x:c.x+r*d1.x,y:c.y+r*d1.y},pm={x:c.x+r*(d1.x+d2.x),y:c.y+r*(d1.y+d2.y)},p2={x:c.x+r*d2.x,y:c.y+r*d2.y};
+  mk("polyline",{points:`${p1.x},${p1.y} ${pm.x},${pm.y} ${p2.x},${p2.y}`,fill:"none",stroke:col,"stroke-width":2.4,"stroke-linejoin":"miter"},par);
+}
+function coinL(par,c,d1,d2,off=10,len=14,col=INK){
+  /* moitié du signe + : un trait vers d1 et un trait vers d2, réunis dans le coin */
+  const q={x:c.x+off*(d1.x+d2.x),y:c.y+off*(d1.y+d2.y)};
+  const p1={x:q.x+len*d1.x,y:q.y+len*d1.y},p2={x:q.x+len*d2.x,y:q.y+len*d2.y};
+  mk("polyline",{points:`${p1.x},${p1.y} ${q.x},${q.y} ${p2.x},${p2.y}`,fill:"none",stroke:col,"stroke-width":2.8,"stroke-linejoin":"miter","stroke-linecap":"butt"},par);
+}
+function allAngles(par,c,u,n,r,col){
+  /* deux angles droits, de part et d'autre de la médiatrice */
+  const m=v=>({x:-v.x,y:-v.y});
+  rightAngle(par,c,u,n,r,col);rightAngle(par,c,n,m(u),r,col);
+}
+
+/* ---------- Partie 1 : définition ---------- */
+function build1(){
+  svg.setAttribute("viewBox","0 0 900 430");
+  const O={x:450,y:225},u={x:.866,y:.5},n={x:.5,y:-.866};
+  const P=(a,b)=>({x:O.x+a*u.x+b*n.x,y:O.y+a*u.y+b*n.y});
+  const A=P(-150,0),B=P(150,0);
+  mk("line",{x1:A.x,y1:A.y,x2:B.x,y2:B.y,stroke:INK,"stroke-width":3.5,"stroke-linecap":"round"});
+  const gT=ghost(mk("g",{}));ticks(gT,P(-75,0),u,1);ticks(gT,P(75,0),u,1);
+  const top=P(0,205),bot=P(0,-190);
+  const perpUp=ghost(mk("line",{x1:O.x,y1:O.y,x2:top.x,y2:top.y,stroke:RED,"stroke-width":3.5,"stroke-linecap":"round"}));
+  const perpDn=ghost(mk("line",{x1:O.x,y1:O.y,x2:bot.x,y2:bot.y,stroke:RED,"stroke-width":3.5,"stroke-linecap":"round"}));
+  const redDot=ghost(mk("circle",{cx:O.x,cy:O.y,r:7,fill:RED}));
+  const gA=ghost(mk("g",{}));coinL(gA,O,u,n);coinL(gA,O,n,{x:-u.x,y:-u.y});
+  const gP=mk("g",{});
+  dot(gP,A,INK);dot(gP,B,INK);txt(gP,A.x-22,A.y-8,"A");txt(gP,B.x+20,B.y+24,"B");
+  const lblE=ghost(mk("g",{}));txt(lblE,bot.x-26,bot.y+8,"e",RED,28);
+  return {steps:[
+    {hl:null,run(a){}},
+    {hl:["mid","perp"],run(a){
+      fade(redDot,a,400);
+      fade(gT,a,500,a?500:0);
+      draw(perpUp,a,1000,a?1100:0);draw(perpDn,a,1000,a?1100:0);
+      fade(lblE,a,500,a?2000:0);
+      fade(gA,a,500,a?2100:0);
+    }}
+  ]};
+}
+
+/* ---------- Partie 2 : égale distance ---------- */
+function build2(){
+  svg.setAttribute("viewBox","0 0 900 430");
+  const O={x:450,y:225},u={x:.866,y:.5},n={x:.5,y:-.866};
+  const P=(a,b)=>({x:O.x+a*u.x+b*n.x,y:O.y+a*u.y+b*n.y});
+  const A=P(-110,0),B=P(110,0);
+  mk("line",{x1:A.x,y1:A.y,x2:B.x,y2:B.y,stroke:INK,"stroke-width":3.5,"stroke-linecap":"round"});
+  const d0=P(0,-175),d1=P(0,215);
+  const dl=ghost(mk("line",{x1:d0.x,y1:d0.y,x2:d1.x,y2:d1.y,stroke:RED,"stroke-width":3.5,"stroke-linecap":"round"}));
+  const dLab=ghost(mk("g",{}));txt(dLab,d1.x+16,d1.y-4,"d",RED,28);
+  const gAB=mk("g",{});
+  dot(gAB,A,INK);dot(gAB,B,INK);txt(gAB,A.x-22,A.y-8,"A");txt(gAB,B.x+20,B.y+24,"B");
+  const defs=[
+    {k:"M",c:GREEN,b:-120,t:1,dx:-24,dy:16},
+    {k:"N",c:OR,b:60,t:2,dx:-6,dy:-18},
+    {k:"Q",c:VIO,b:160,t:3,dx:-26,dy:-12}];
+  const items=defs.map((q,i)=>{
+    const Pt=P(0,q.b);
+    const sa=ghost(mk("line",{x1:Pt.x,y1:Pt.y,x2:A.x,y2:A.y,stroke:q.c,"stroke-width":3,"stroke-linecap":"round"}));
+    const sb=ghost(mk("line",{x1:Pt.x,y1:Pt.y,x2:B.x,y2:B.y,stroke:q.c,"stroke-width":3,"stroke-linecap":"round"}));
+    const gp=ghost(mk("g",{}));dot(gp,Pt,q.c,6);txt(gp,Pt.x+q.dx,Pt.y+q.dy,q.k,q.c,26);
+    const gt=ghost(mk("g",{}));
+    const norm=(p,r)=>{const l=Math.hypot(r.x-p.x,r.y-p.y);return {x:(r.x-p.x)/l,y:(r.y-p.y)/l}};
+    ticks(gt,{x:(Pt.x+A.x)/2,y:(Pt.y+A.y)/2},norm(Pt,A),q.t,q.c);
+    ticks(gt,{x:(Pt.x+B.x)/2,y:(Pt.y+B.y)/2},norm(Pt,B),q.t,q.c);
+    const eq=ghost(mk("g",{}));txt(eq,690,150+i*48,`${q.k}A = ${q.k}B`,q.c,28,"start");
+    return {sa,sb,gp,gt,eq};
+  });
+  const [m,nn,q]=items;
+  const placeSegs=(it,a,d)=>{fade(it.gp,a,400,d);draw(it.sa,a,700,d+500);draw(it.sb,a,700,d+500)};
+  const mark=(it,a,d)=>{fade(it.gt,a,400,d);fade(it.eq,a,400,d+200)};
+  return {steps:[
+    {hl:null,run(a){}},
+    {hl:"all",run(a){
+      draw(dl,a,1000,0);fade(dLab,a,400,900);
+      placeSegs(m,a,1500);mark(m,a,2900);
+      placeSegs(nn,a,3800);mark(nn,a,5200);
+      placeSegs(q,a,6100);mark(q,a,7500);
+    }}
+  ]};
+}
+
+/* ---------- Partie 3 : axe de symétrie (miroir) ---------- */
+function build3(){
+  svg.setAttribute("viewBox","0 0 900 450");
+  const INC=28,Y=190,A=130,B=310,M0=470,ME=(A+B)/2,DUR=11000;
+  const st={prog:0,rev:1,running:false,ended:false};
+  const slider=document.getElementById("slider");
+  const axis=(mk("line",{x1:80,y1:Y,x2:520,y2:Y,stroke:"#9fb3c0","stroke-width":1.6,"stroke-dasharray":"7 6"}));
+  const seg=(mk("line",{x1:A,y1:Y,x2:B,y2:Y,stroke:BLUE,"stroke-width":9,"stroke-linecap":"round"}));
+  /* axe de symétrie */
+  const gM=ghost(mk("g",{transform:`translate(${M0} 0)`}));
+  mk("line",{x1:0,y1:Y-120,x2:0,y2:Y+120,stroke:RED,"stroke-width":5,"stroke-linecap":"round"},gM);
+  const mLab=txt(gM,0,Y-132,"axe de symétrie",RED,22);
+  /* image */
+  const imgSeg=ghost(mk("line",{x1:A,y1:Y,x2:B,y2:Y,stroke:OR,"stroke-width":4,"stroke-linecap":"round"}));
+  /* points et noms de AB */
+  const gAB=(mk("g",{}));
+  dot(gAB,{x:A,y:Y},BLUE,6.5);dot(gAB,{x:B,y:Y},BLUE,6.5);
+  txt(gAB,A,Y+38,"A",BLUE,26);txt(gAB,B,Y+38,"B",BLUE,26);
+  /* points et noms de l'image */
+  const gImg=ghost(mk("g",{}));
+  const rA=mk("circle",{cx:A,cy:Y,r:11,fill:"none",stroke:OR,"stroke-width":3.2},gImg);
+  const rB=mk("circle",{cx:B,cy:Y,r:11,fill:"none",stroke:OR,"stroke-width":3.2},gImg);
+  const lA2=txt(gImg,A,Y-22,"A′",OR,26),lB2=txt(gImg,B,Y-22,"B′",OR,26);
+  /* décor final */
+  const gEq=ghost(mk("g",{}));
+  const gEnd=ghost(mk("g",{}));
+  allAngles(gEnd,{x:ME,y:Y},{x:1,y:0},{x:0,y:-1},14,INK);
+  ticks(gEnd,{x:(A+ME)/2,y:Y},{x:1,y:0},1,INK,24,7,3);
+  ticks(gEnd,{x:(ME+B)/2,y:Y},{x:1,y:0},1,INK,24,7,3);
+  txt(gEq,700,205,"A′ = B",OR,32,"start");txt(gEq,700,250,"B′ = A",OR,32,"start");
+
+  function update(){
+    const m=M0+(ME-M0)*st.prog,im=x=>m+st.rev*(m-x),a2=im(A),b2=im(B);
+    gM.setAttribute("transform",`translate(${m} 0)`);
+    imgSeg.setAttribute("x1",a2);imgSeg.setAttribute("x2",b2);
+    rA.setAttribute("cx",a2);rB.setAttribute("cx",b2);
+    lA2.setAttribute("x",a2);lB2.setAttribute("x",b2);lA2.setAttribute("transform",`rotate(${INC} ${a2} ${Y-22})`);lB2.setAttribute("transform",`rotate(${INC} ${b2} ${Y-22})`);
+    slider.value=Math.round(st.prog*1000);
+    const end=st.prog>=1;
+    if(end&&!st.ended){st.ended=true;mLab.textContent="axe de symétrie : médiatrice de AB";fade(gEnd,true,700);fade(gEq,true,700)}
+    else if(!end&&st.ended){st.ended=false;mLab.textContent="axe de symétrie";fade(gEnd,false);gEnd.style.opacity=0;fade(gEq,false);gEq.style.opacity=0}
+  }
+  let looping=false;
+  function startLoop(){
+    if(looping)return;looping=true;let last=0;
+    const f=ts=>{
+      if(!last)last=ts;const dt=ts-last;last=ts;
+      if(st.running){st.prog=Math.min(1,st.prog+dt/DUR);update();if(st.prog>=1){st.running=false;setPause()}}
+      if(st.running){rafs.add(requestAnimationFrame(f))}else looping=false;
+    };
+    rafs.add(requestAnimationFrame(f));
+  }
+  const setPause=()=>{document.getElementById("bPause").textContent=st.running?"Pause":"Reprendre"};
+  ctl={
+    pause(){ if(st.running){st.running=false}else{if(st.prog>=1)st.prog=0;st.running=true;startLoop()} setPause() },
+    replay(){ st.prog=0;st.running=true;update();setPause();startLoop() },
+    seek(v){ st.running=false;st.prog=v/1000;update();setPause() }
+  };
+  slider.oninput=()=>ctl.seek(+slider.value);
+  update();
+  const Rg=mk("g",{transform:`translate(37 88) scale(1.15) rotate(${-INC} 220 190)`});
+  [...svg.children].forEach(c=>{if(c!==Rg&&c!==gEq)Rg.appendChild(c)});
+  svg.appendChild(gEq);
+  Rg.querySelectorAll("text").forEach(t=>{if(t===lA2||t===lB2)return;t.setAttribute("transform",`rotate(${INC} ${t.getAttribute("x")} ${t.getAttribute("y")})`)});
+  update();
+
+  return {steps:[
+    {hl:null,run(a){}},
+    {hl:"all",ctl:true,run(a){
+      if(!a){
+        st.rev=1;st.prog=1;st.ended=true;update();setPause();
+        mLab.textContent="axe de symétrie : médiatrice de AB";
+        fade(gM,false);fade(imgSeg,false);fade(gImg,false);fade(gEnd,false);fade(gEq,false);return;
+      }
+      st.rev=0;st.prog=0;update();
+      fade(gM,true,700);
+      at(1000,()=>{imgSeg.style.opacity=1;gImg.style.opacity=1;tween(1500,t=>{st.rev=t;update()},()=>{st.rev=1;update()})});
+      at(3000,()=>{showCtl(true);st.running=true;setPause();startLoop()});
+      at(0,()=>setHL("all"));
+    }}
+  ]};
+}
+
+/* ---------- Partie 4 : construction ---------- */
+function build4(){
+  svg.setAttribute("viewBox","0 0 900 450");
+  const CY="#1a8fd0";
+  const A={x:280,y:265},B={x:620,y:175};
+  const O={x:(A.x+B.x)/2,y:(A.y+B.y)/2};
+  const L=Math.hypot(B.x-A.x,B.y-A.y),u={x:(B.x-A.x)/L,y:(B.y-A.y)/L};
+  const nv={x:u.y,y:-u.x};
+  const r=.66*L,k=Math.sqrt(r*r-L*L/4);
+  const M={x:O.x+k*nv.x,y:O.y+k*nv.y},N={x:O.x-k*nv.x,y:O.y-k*nv.y};
+  const arcPath=C=>{
+    const ang=P=>Math.atan2(P.y-C.y,P.x-C.x);
+    const aM=ang(M),aN=ang(N);
+    let d=aM-aN;d=((d+3*Math.PI)%(2*Math.PI))-Math.PI;
+    const s0=d>0?aN:aM,e0=s0+Math.abs(d),dl=.13,a1=s0-dl,a2=e0+dl;
+    const p=a=>({x:C.x+r*Math.cos(a),y:C.y+r*Math.sin(a)});
+    const p1=p(a1),p2=p(a2);
+    return `M${p1.x} ${p1.y}A${r} ${r} 0 0 1 ${p2.x} ${p2.y}`;
+  };
+  mk("line",{x1:A.x,y1:A.y,x2:B.x,y2:B.y,stroke:INK,"stroke-width":3.5,"stroke-linecap":"round"});
+  const arcA=ghost(mk("path",{d:arcPath(A),fill:"none",stroke:CY,"stroke-width":2.8,"stroke-linecap":"round"}));
+  const arcB=ghost(mk("path",{d:arcPath(B),fill:"none",stroke:CY,"stroke-width":2.8,"stroke-linecap":"round"}));
+  const gMN=ghost(mk("g",{}));
+  dot(gMN,M,INK,4.5);dot(gMN,N,INK,4.5);
+  txt(gMN,M.x-22,M.y-6,"M");txt(gMN,N.x+20,N.y+24,"N");
+  const red=ghost(mk("line",{x1:M.x+nv.x*28,y1:M.y+nv.y*28,x2:N.x-nv.x*28,y2:N.y-nv.y*28,stroke:RED,"stroke-width":3.5,"stroke-linecap":"round"}));
+  const gAng=ghost(mk("g",{}));
+  coinL(gAng,O,u,nv);coinL(gAng,O,nv,{x:-u.x,y:-u.y});
+  const gAB=mk("g",{});
+  dot(gAB,A,INK);dot(gAB,B,INK);txt(gAB,A.x-20,A.y+24,"A");txt(gAB,B.x+20,B.y-10,"B");
+  /* justification : le losange AMBN */
+  const sides=[[A,M],[M,B],[B,N],[N,A]].map(([P,Q])=>ghost(mk("line",{x1:P.x,y1:P.y,x2:Q.x,y2:Q.y,stroke:OR,"stroke-width":4,"stroke-linecap":"round"})));
+  const gTk=ghost(mk("g",{}));
+  [[A,M],[M,B],[B,N],[N,A]].forEach(([P,Q])=>{
+    const l=Math.hypot(Q.x-P.x,Q.y-P.y);
+    ticks(gTk,{x:(P.x+Q.x)/2,y:(P.y+Q.y)/2},{x:(Q.x-P.x)/l,y:(Q.y-P.y)/l},1,OR,16,7,3);
+  });
+  let shown=false;
+  const stepTxt=()=>scene.steps[3].txt;
+  const JTXT='<b class="etp" style="background:#e07b00">JUSTIFICATION</b>Les diagonales d’un losange se coupent perpendiculairement en leur milieu.';
+  const swap=(html,delay)=>{
+    const sp=$("stp");sp.style.transition="opacity .5s";sp.style.opacity=0;
+    at(delay,()=>{sp.innerHTML=html;sp.style.opacity=1});
+  };
+  jfn=()=>{
+    shown=!shown;
+    if(shown){
+      sides.forEach((e,i)=>draw(e,true,500,i*450));
+      fade(gTk,true,500,1900);
+      swap(JTXT,2300);
+    }else{
+      sides.forEach(e=>fadeOut(e,true));fadeOut(gTk,true);
+      swap(stepTxt(),500);
+    }
+  };
+  return {steps:[
+    {hl:null,run(a){}},
+    {hl:"verb",txt:"<b class=\"etp\">ÉTAPE 1</b>Tracer un arc de cercle dont le centre est une extrémité du segment et dont le rayon est plus grand que la moitié du segment.",run(a){draw(arcA,a,1300)}},
+    {hl:"verb",txt:"<b class=\"etp\">ÉTAPE 2</b>Tracer un arc de cercle de même rayon dont le centre est l’autre extrémité du segment.",run(a){draw(arcB,a,1300);fade(gMN,a,500,a?1400:0)}},
+    {just:true,hl:"verb",txt:"<b class=\"etp\">ÉTAPE 3</b>Tracer la droite qui passe par les deux points d’intersection obtenus. C’est la médiatrice du segment.",run(a){
+      draw(red,a,1000);fade(gAng,a,500,a?1000:0);
+      if(a)at(1700,()=>showJust(true));
+    }}
+  ]};
+}
+
+/* ---------- moteur ---------- */
+const parts=[
+  {tab:"1. Définition",lab:"Définition",n:2,build:build1,
+   html:'La médiatrice d’un segment est la droite <span class="hl" data-k="perp">perpendiculaire à ce segment</span> et qui <span class="hl" data-k="mid">le coupe en son milieu</span>.'},
+  {tab:"2. Égale distance",lab:"Propriété 1",n:2,build:build2,
+   html:'La médiatrice d’un segment est l’<span class="hl" data-k="all">ensemble des points à égale distance des extrémités</span> de ce segment.'},
+  {tab:"3. Axe de symétrie",lab:"Propriété 2",n:2,build:build3,
+   html:'La médiatrice d’un segment est un <span class="hl" data-k="all">axe de symétrie</span> de ce segment.'},
+  {tab:"4. Construction",lab:"Construction",n:4,build:build4,
+   html:'<span class="hl" data-k="verb">Construire</span> la médiatrice d’un segment.<div class="stp" id="stp"></div>'}
+];
+function showJust(v){$("bJust").style.display=v?"":"none"}
+function showCtl(v){$("ctl3").style.display=v?"flex":"none"}
+function setHL(k){const ks=Array.isArray(k)?k:(k?[k]:[]);document.querySelectorAll(".hl").forEach(h=>h.classList.toggle("on",ks.includes(h.dataset.k)))}
+let cur={p:0,s:0},scene=null;
+const $=id=>document.getElementById(id);
+$("tabs").innerHTML=parts.map((p,i)=>`<button class="tab" data-i="${i}">${p.tab}</button>`).join("");
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>go(+b.dataset.i,0,false));
+
+function go(p,s,anim){
+  cancelAll();ctl={};jfn=null;
+  svg.innerHTML="";
+  scene=parts[p].build();
+  for(let i=0;i<s;i++)scene.steps[i].run(false);
+  const stp=scene.steps[s];
+  stp.run(anim);
+  cur={p,s};
+  $("lab").textContent=parts[p].lab;
+  $("txt").innerHTML=parts[p].html;
+  if($("stp"))$("stp").innerHTML=stp.txt||"";
+  setHL(anim&&stp.hlAnim!==undefined?stp.hlAnim:stp.hl);
+  document.querySelectorAll(".tab").forEach((t,i)=>t.classList.toggle("on",i===p));
+  $("dots").innerHTML=Array.from({length:parts[p].n},(_,i)=>`<i class="${i<=s?"on":""} ${i===s?"cur":""}"></i>`).join("");
+  showCtl(!!stp.ctl&&!anim);showJust(!!stp.just&&!anim);
+  $("bPrev").style.visibility=(p===0&&s===0)?"hidden":"visible";
+  const last=(p===parts.length-1&&s===parts[p].n-1);
+  $("bNext").style.visibility=last?"hidden":"visible";
+}
+function next(){
+  const {p,s}=cur;
+  if(s<parts[p].n-1)go(p,s+1,true);else if(p<parts.length-1)go(p+1,0,false);
+}
+function prev(){
+  const {p,s}=cur;
+  if(s>0)go(p,s-1,false);else if(p>0)go(p-1,parts[p-1].n-1,false);
+}
+$("bJust").onclick=e=>{e.stopPropagation();if(jfn)jfn()};
+$("bNext").onclick=e=>{e.stopPropagation();next()};
+$("bPrev").onclick=e=>{e.stopPropagation();prev()};
+$("sw").onclick=next;
+document.addEventListener("keydown",e=>{
+  if(e.target&&e.target.tagName==="INPUT")return;
+  if(["ArrowRight","PageDown"," ","Enter"].includes(e.key)){e.preventDefault();next()}
+  else if(["ArrowLeft","PageUp","Backspace"].includes(e.key)){e.preventDefault();prev()}
+});
+go(0,0,false);
+</script>
+</body>
+</html>

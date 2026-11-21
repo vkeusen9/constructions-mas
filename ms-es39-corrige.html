@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ES39 Quel quadrilatère ?</title>
+<style>
+:root{--cy:#0099b8;--ink:#222}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:var(--ink);font-family:"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:1280px;margin:0 auto;padding:10px 18px 14px}
+h1{margin:0 0 8px;font-size:28px;color:var(--cy);border-bottom:2px solid var(--cy);padding-bottom:6px;display:flex;align-items:center;gap:12px}
+h1 small{color:var(--cy);font-size:28px}
+.ring{display:inline-block;width:30px;height:30px;border:7px solid #bfe3ee;border-radius:50%;flex:none}
+button{font:inherit}
+.nb{border:2px solid var(--cy);background:#fff;color:var(--cy);border-radius:8px;padding:8px 18px;font-size:18px;font-weight:700;cursor:pointer}
+.nb:hover{background:#e6f6fa}
+.nb.go{background:var(--cy);color:#fff}
+.nb.go:hover{background:#007f9a}
+.nav{display:flex;align-items:center;gap:12px;margin:0 0 10px}
+.dots{flex:1;display:flex;gap:7px;justify-content:center;flex-wrap:wrap}
+.dots i{width:12px;height:12px;border-radius:50%;background:#cfe6ee}
+.dots i.on{background:var(--cy)}
+.dots i.cur{box-shadow:0 0 0 3px #bfe3ee}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:14px;align-items:start}
+.card{border:1px solid #cfe0ea;border-radius:8px;background:#fff;padding:6px 8px 8px}
+.card h2{margin:0 0 4px;font-size:15px;font-weight:700;color:var(--cy);text-transform:uppercase;letter-spacing:.04em}
+svg{display:block;width:100%;height:auto}
+#stage{max-height:calc(100vh - 190px);cursor:pointer}
+svg text{font-family:"Segoe UI",Helvetica,Arial,sans-serif}
+#steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+#steps li{border-radius:6px;padding:9px 12px;font-size:19px;line-height:1.35;opacity:0;transition:opacity .5s;display:flex;gap:10px}
+#steps li.on{opacity:1}
+#steps .n{flex:none;font-weight:800;color:#555;width:1.3em}
+#steps i{font-style:italic}
+.res{display:block;margin-top:6px;opacity:0;transition:opacity .6s}
+.res.on{opacity:1}
+.res b{font-weight:700}
+.hat{position:relative;display:inline-block;font-style:italic}
+.hat::before{content:"";position:absolute;left:8%;right:8%;top:-.1em;height:.3em;border-top:1.6px solid currentColor;border-radius:50% 50% 0 0/100% 100% 0 0}
+@media(max-width:900px){.grid{grid-template-columns:1fr}#stage{max-height:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <h1><span class="ring"></span><small>ES39</small> Quel quadrilatère ?</h1>
+ <div class="nav">
+  <button class="nb" id="bPrev">◀ Précédent</button>
+  <div class="dots" id="dots"></div>
+  <button class="nb go" id="bNext">Suivant ▶</button>
+ </div>
+ <div class="grid">
+  <div class="card"><h2>Construction</h2><svg id="stage" viewBox="0 30 400 480"></svg></div>
+  <div class="card"><h2>Marche à suivre</h2>
+   <ol id="steps">
+    <li style="background:#fde2e4"><span class="n">1.</span><span>Dessiner un angle aigu <span class="hat">aOb</span> de 65°.</span></li>
+    <li style="background:#fff1c9"><span class="n">2.</span><span>Placer, sur <i>Oa</i>, un point <i>A</i> situé à 6,5 cm de <i>O</i>.</span></li>
+    <li style="background:#dff3e0"><span class="n">3.</span><span>Construire la perpendiculaire <i>p</i> à <i>Oa</i> passant par <i>A</i>. <i>p</i> coupe le côté <i>Ob</i> en <i>B</i>.</span></li>
+    <li style="background:#d9ecfa"><span class="n">4.</span><span>Construire la médiatrice <i>m</i> du segment <i>OB</i>. <i>m</i> coupe <i>OB</i> en <i>M</i>.</span></li>
+    <li style="background:#ebe0f7"><span class="n">5.</span><span>Tracer la parallèle <i>i</i> à <i>Ob</i> qui passe par <i>A</i>. <i>m</i> coupe <i>i</i> en <i>D</i>.</span></li>
+    <li style="background:#ffe3cc"><span class="n">6.</span><span>Quelle est la nature du quadrilatère <i>AMBD</i> ?<span class="res" id="res"><b><i>AMBD</i> est un trapèze rectangle.</b><br>Les côtés <i>MB</i> et <i>AD</i> sont parallèles, et <i>m</i> est perpendiculaire à <i>Ob</i> et à <i>i</i> : il y a deux angles droits, en <i>M</i> et en <i>D</i>.</span></span></li>
+   </ol>
+  </div>
+ </div>
+</div>
+<script>
+const NS="http://www.w3.org/2000/svg";
+const svg=document.getElementById("stage");
+const OR="#e07b00",INK="#222",CY="#1a8fd0";
+const $=id=>document.getElementById(id);
+let timers=[];
+
+/* ---------- outils SVG ---------- */
+function mk(tag,at,par){const e=document.createElementNS(NS,tag);for(const k in at)e.setAttribute(k,at[k]);(par||svg).appendChild(e);return e}
+function ghost(e){e.style.opacity=0;return e}
+function at(ms,f){timers.push(setTimeout(f,ms))}
+function cancelAll(){timers.forEach(clearTimeout);timers=[]}
+function fade(e,a,dur=500,delay=0){
+  e.style.transition="none";
+  if(!a){e.style.opacity=1;return}
+  e.style.opacity=0;void e.getBoundingClientRect();
+  e.style.transition=`opacity ${dur}ms ease ${delay}ms`;e.style.opacity=1;
+}
+function draw(e,a,dur=900,delay=0){
+  if(!a){e.style.transition="none";e.style.opacity=1;e.style.strokeDasharray="";return}
+  const L=e.getTotalLength();
+  e.style.transition="none";e.style.strokeDasharray=L;e.style.strokeDashoffset=L;e.style.opacity=1;
+  void e.getBoundingClientRect();
+  e.style.transition=`stroke-dashoffset ${dur}ms ease-in-out ${delay}ms`;e.style.strokeDashoffset=0;
+  at(dur+delay+60,()=>{e.style.strokeDasharray="";e.style.transition="none"});
+}
+function txt(par,x,y,s,col=INK,size=26,anchor="middle",w=600,ital=true){
+  const t=mk("text",{x,y,fill:col,"font-size":size,"text-anchor":anchor,"font-weight":w,"font-style":ital?"italic":"normal"},par);t.textContent=s;return t;
+}
+function dot(par,p,col=INK,r=3.2){return mk("circle",{cx:p.x,cy:p.y,r,fill:col},par)}
+function line(par,a,b,col=INK,w=1.7,extra={}){return mk("line",Object.assign({x1:a.x,y1:a.y,x2:b.x,y2:b.y,stroke:col,"stroke-width":w,"stroke-linecap":"round"},extra),par)}
+function coinL(par,c,d1,d2,col=INK,off=9,len=13,w=1.5){
+  const q={x:c.x+off*(d1.x+d2.x),y:c.y+off*(d1.y+d2.y)};
+  const p1={x:q.x+len*d1.x,y:q.y+len*d1.y},p2={x:q.x+len*d2.x,y:q.y+len*d2.y};
+  return mk("polyline",{points:`${p1.x},${p1.y} ${q.x},${q.y} ${p2.x},${p2.y}`,fill:"none",stroke:col,"stroke-width":w},par);
+}
+function arcPath(C,r,a1,a2){
+  const p=a=>({x:C.x+r*Math.cos(a),y:C.y+r*Math.sin(a)});
+  const p1=p(a1),p2=p(a2);
+  return `M${p1.x} ${p1.y}A${r} ${r} 0 ${Math.abs(a2-a1)>Math.PI?1:0} 1 ${p2.x} ${p2.y}`;
+}
+function head(par,p,d,col){
+  const s=10,w=4,b={x:p.x-d.x*s,y:p.y-d.y*s},n={x:-d.y,y:d.x};
+  mk("polygon",{points:`${p.x},${p.y} ${b.x+n.x*w},${b.y+n.y*w} ${b.x-n.x*w},${b.y-n.y*w}`,fill:col},par);
+}
+function cote(par,p1,p2,label,col,ext,gap=40,size=22){
+  const L=Math.hypot(p2.x-p1.x,p2.y-p1.y),d={x:(p2.x-p1.x)/L,y:(p2.y-p1.y)/L};
+  const m={x:(p1.x+p2.x)/2,y:(p1.y+p2.y)/2};
+  const a1={x:m.x-d.x*gap,y:m.y-d.y*gap},a2={x:m.x+d.x*gap,y:m.y+d.y*gap};
+  line(par,p1,a1,col,1.4);line(par,a2,p2,col,1.4);
+  head(par,p1,{x:-d.x,y:-d.y},col);head(par,p2,d,col);
+  ext.forEach(([a,b])=>line(par,a,b,col,1));
+  txt(par,m.x,m.y+8,label,col,size,"middle",700,false);
+}
+function chevrons(par,c,d,col,n=2){
+  const nn={x:-d.y,y:d.x};
+  for(let i=0;i<n;i++){
+    const o=(i-(n-1)/2)*9,q={x:c.x+d.x*o,y:c.y+d.y*o};
+    mk("polyline",{points:`${q.x-d.x*6+nn.x*6},${q.y-d.y*6+nn.y*6} ${q.x+d.x*3},${q.y+d.y*3} ${q.x-d.x*6-nn.x*6},${q.y-d.y*6-nn.y*6}`,fill:"none",stroke:col,"stroke-width":1.8,"stroke-linecap":"round","stroke-linejoin":"round"},par);
+  }
+}
+
+/* ---------- géométrie (1 cm = 24 unités) ---------- */
+const K=24,OX=80,OY=420,toS=(x,y)=>({x:OX+K*x,y:OY-K*y});
+const th=65*Math.PI/180;
+const u={x:Math.cos(th),y:-Math.sin(th)};          // direction de Ob (écran)
+const nr={x:-u.y,y:u.x};                          // perpendiculaire à Ob, vers le bas à droite
+const add=(P,v,t)=>({x:P.x+v.x*t,y:P.y+v.y*t});
+const dotp=(a,b)=>a.x*b.x+a.y*b.y;
+const ang=(P,Q)=>Math.atan2(Q.y-P.y,Q.x-P.x);
+const O=toS(0,0),A=toS(6.5,0),B=toS(6.5,6.5*Math.tan(th));
+const M={x:(O.x+B.x)/2,y:(O.y+B.y)/2};
+const sD=dotp({x:M.x-A.x,y:M.y-A.y},u);
+const D=add(A,u,sD);
+const OB=Math.hypot(B.x-O.x,B.y-O.y);
+/* compas : perpendiculaire en A */
+const r1=48,r2=77,hS=Math.sqrt(r2*r2-r1*r1);
+const P={x:A.x-r1,y:A.y},Q={x:A.x+r1,y:A.y},S={x:A.x,y:A.y-hS};
+/* compas : médiatrice de OB */
+const r3=216,hE=Math.sqrt(r3*r3-OB*OB/4);
+const E1=add(M,nr,-hE),E2=add(M,nr,hE);
+
+/* ---------- construction ---------- */
+function build(){
+  svg.innerHTML="";
+  /* étape 1 : l'angle */
+  const Oa=ghost(line(svg,O,toS(9.8,0)));
+  const Ob=ghost(line(svg,O,add(O,u,16.2*K)));
+  const arc65=ghost(mk("path",{d:arcPath(O,58,-th,0),fill:"none",stroke:OR,"stroke-width":1.9}));
+  const g65=ghost(mk("g",{}));txt(g65,O.x+88*Math.cos(th/2),O.y-88*Math.sin(th/2)+8,"65°",OR,22,"middle",700,false);
+  const gAng=ghost(mk("g",{}));
+  txt(gAng,O.x-22,O.y+10,"O");txt(gAng,toS(9.8,0).x+16,O.y+8,"a");
+  const eb=add(O,u,16.2*K);txt(gAng,eb.x+16,eb.y+2,"b");
+  /* étape 2 : le point A */
+  const gA=ghost(mk("g",{}));dot(gA,A);txt(gA,A.x+22,A.y+24,"A");
+  const yc=470;
+  const g65c=ghost(mk("g",{}));
+  cote(g65c,{x:O.x,y:yc},{x:A.x,y:yc},"6,5 cm",OR,[[{x:O.x,y:O.y+14},{x:O.x,y:yc+8}],[{x:A.x,y:A.y+18},{x:A.x,y:yc+8}]],40,22);
+  /* étape 3 : perpendiculaire p au compas */
+  const mkArc=(c,r,a1,a2,w=1.4)=>ghost(mk("path",{d:arcPath(c,r,a1,a2),fill:"none",stroke:CY,"stroke-width":w,"stroke-linecap":"round"}));
+  const arcA=mkArc(A,r1,Math.PI-.3,2*Math.PI+.3);
+  const aP=ang(P,S),aQ=ang(Q,S);
+  const arcP=mkArc(P,r2,aP-.33,aP+.33),arcQ=mkArc(Q,r2,aQ-.33,aQ+.33);
+  const pl=ghost(line(svg,{x:A.x,y:A.y+18},{x:A.x,y:60}));
+  const gPQ=ghost(mk("g",{}));dot(gPQ,P,CY,3);dot(gPQ,Q,CY,3);
+  const gS=ghost(mk("g",{}));dot(gS,S,CY,3);
+  const gRA=ghost(mk("g",{}));
+  coinL(gRA,A,{x:-1,y:0},{x:0,y:-1});coinL(gRA,A,{x:1,y:0},{x:0,y:-1});
+  const gp=ghost(mk("g",{}));txt(gp,A.x-16,62,"p");
+  const gB=ghost(mk("g",{}));dot(gB,B);txt(gB,B.x+26,B.y+14,"B");
+  /* étape 4 : médiatrice m au compas */
+  const aOE1=ang(O,E1),aOE2=ang(O,E2),aBE1=ang(B,E1),aBE2=ang(B,E2);
+  const arcsM=[mkArc(O,r3,aOE1-.25,aOE1+.25),mkArc(O,r3,aOE2-.25,aOE2+.25),mkArc(B,r3,aBE1-.25,aBE1+.25),mkArc(B,r3,aBE2-.25,aBE2+.25)];
+  const gE=ghost(mk("g",{}));dot(gE,E1,CY,3);dot(gE,E2,CY,3);
+  const ml=ghost(line(svg,add(M,nr,-135),add(M,nr,168)));
+  const gm=ghost(mk("g",{}));{const e=add(M,nr,-135);txt(gm,e.x-6,e.y-10,"m")}
+  const gM=ghost(mk("g",{}));dot(gM,M);txt(gM,M.x-24,M.y+8,"M");
+  const gLM=ghost(mk("g",{}));const LM=coinL(gLM,M,u,nr);
+  /* étape 5 : parallèle i et point D */
+  const il=ghost(line(svg,add(A,u,-8),add(A,u,150)));
+  const gi=ghost(mk("g",{}));{const e=add(A,u,150);txt(gi,e.x+14,e.y-4,"i")}
+  const gD=ghost(mk("g",{}));dot(gD,D);txt(gD,D.x+24,D.y+8,"D");
+  /* étape 6 : le quadrilatère AMBD */
+  const quad=ghost(mk("polygon",{points:[A,M,B,D].map(p=>p.x+","+p.y).join(" "),fill:"#ffb066","fill-opacity":.18,stroke:OR,"stroke-width":2,"stroke-linejoin":"round"}));
+  const gQ=ghost(mk("g",{}));
+  coinL(gQ,D,{x:-u.x,y:-u.y},{x:-nr.x,y:-nr.y},OR,9,13,1.8);
+  chevrons(gQ,{x:(M.x+B.x)/2,y:(M.y+B.y)/2},u,OR);
+  chevrons(gQ,{x:(A.x+D.x)/2,y:(A.y+D.y)/2},u,OR);
+  /* points et noms au-dessus des traits */
+  [gAng,gA,gPQ,gS,gRA,gp,gB,gE,gm,gM,gLM,gi,gD].forEach(g=>svg.appendChild(g));
+  const colLM=c=>LM.setAttribute("stroke",c);
+
+  const steps=[
+    {run(a){}},
+    {run(a){draw(Oa,a,900);draw(Ob,a,900,a?700:0);fade(gAng,a,500,a?1300:0);draw(arc65,a,600,a?1700:0);fade(g65,a,500,a?2200:0)}},
+    {run(a){fade(gA,a,500);fade(g65c,a,600,a?500:0)}},
+    {run(a){
+      draw(arcA,a,900);fade(gPQ,a,400,a?900:0);
+      draw(arcP,a,900,a?1300:0);draw(arcQ,a,900,a?1300:0);
+      fade(gS,a,400,a?2300:0);
+      draw(pl,a,1200,a?2700:0);fade(gRA,a,500,a?3900:0);fade(gp,a,500,a?3600:0);fade(gB,a,500,a?4000:0);
+    }},
+    {run(a){
+      arcsM.forEach(e=>draw(e,a,1000));fade(gE,a,400,a?1000:0);
+      draw(ml,a,1200,a?1500:0);fade(gm,a,500,a?2500:0);fade(gM,a,500,a?2700:0);fade(gLM,a,500,a?3000:0);
+    }},
+    {run(a){draw(il,a,1100);fade(gi,a,500,a?900:0);fade(gD,a,500,a?1100:0)}},
+    {run(a){fade(quad,a,700);fade(gQ,a,600,a?600:0);colLM(OR)}}
+  ];
+  return steps;
+}
+
+/* ---------- navigation ---------- */
+const NSTEP=6;
+let steps=null,cur=0;
+const rows=[...document.querySelectorAll("#steps li")];
+function go(s,anim){
+  cancelAll();
+  steps=build();
+  for(let i=1;i<s;i++)steps[i].run(false);
+  steps[s].run(anim);
+  cur=s;
+  rows.forEach((r,i)=>{r.style.transition=(anim&&i===s-1)?"opacity .5s":"none";r.classList.toggle("on",i<s)});
+  const res=$("res");res.style.transition="none";res.classList.remove("on");
+  if(s===NSTEP){void res.offsetWidth;res.style.transition="opacity .6s";at(anim?1200:0,()=>res.classList.add("on"))}
+  $("dots").innerHTML=Array.from({length:NSTEP+1},(_,i)=>`<i class="${i<=s?"on":""} ${i===s?"cur":""}"></i>`).join("");
+  $("bPrev").style.visibility=s===0?"hidden":"visible";
+  $("bNext").style.visibility=s===NSTEP?"hidden":"visible";
+}
+const next=()=>{if(cur<NSTEP)go(cur+1,true)};
+const prev=()=>{if(cur>0)go(cur-1,false)};
+$("bNext").onclick=e=>{e.stopPropagation();next()};
+$("bPrev").onclick=e=>{e.stopPropagation();prev()};
+svg.onclick=next;
+document.addEventListener("keydown",e=>{
+  if(["ArrowRight","PageDown"," ","Enter"].includes(e.key)){e.preventDefault();next()}
+  else if(["ArrowLeft","PageUp","Backspace"].includes(e.key)){e.preventDefault();prev()}
+});
+go(0,false);
+</script>
+</body>
+</html>

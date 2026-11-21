@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ES52 Isocèles : corrigé dynamique</title>
+<style>
+  :root{--blue:#0070c0;--green:#1e9e4a;--green-bg:#e6f6ec;--red:#d33a2c;--red-bg:#fdecea;--ink:#222;--line:#d9dee5}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:#f6f8fb;color:var(--ink);font-family:"Segoe UI",Calibri,Arial,sans-serif}
+  header{display:flex;align-items:center;gap:14px;padding:14px 22px 6px}
+  header .tag{background:#fff;border:2px solid var(--blue);color:var(--blue);font-weight:700;border-radius:999px;padding:4px 16px;font-size:20px}
+  header .bar{flex:1;height:6px;background:var(--blue);border-radius:3px}
+  #tabs{display:flex;gap:8px;padding:6px 22px 10px;flex-wrap:wrap}
+  #tabs button{font-size:18px;padding:6px 16px;border-radius:999px;min-width:48px}
+  #tabs button.act{background:var(--blue);color:#fff}
+  main{display:grid;grid-template-columns:1fr 1.2fr 1fr;gap:14px;padding:0 22px}
+  .panel{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-height:440px;display:flex;flex-direction:column}
+  .panel h2{margin:0 0 6px;font-size:15px;letter-spacing:.04em;text-transform:uppercase;color:var(--blue)}
+  .panel svg{width:100%;height:auto;flex:1}
+  .ov{fill:none;stroke:var(--c,var(--green));stroke-width:3;stroke-linecap:butt;stroke-linejoin:round;stroke-dasharray:1;stroke-dashoffset:1;transition:stroke-dashoffset .9s ease var(--d,0s)}
+  .ov.on{stroke-dashoffset:0}
+  .ov.thin{stroke-width:2.5}
+  .ov.bad{stroke:var(--red);stroke-width:4}
+  .ovt{fill:var(--cd,var(--green));opacity:0;transition:opacity .5s ease var(--d,.5s)}
+  .ovt.on{opacity:1}
+  
+  .fillg{fill:var(--c,var(--green));opacity:0;transition:opacity .8s ease .6s}
+  .fillg.on{opacity:.16}
+  .pop{fill:var(--c,var(--green));opacity:0;transform-box:fill-box;transform-origin:center;transform:scale(.3);transition:opacity .4s ease var(--d,0s),transform .4s ease var(--d,0s)}
+  .pop.on{opacity:1;transform:scale(1)}
+  .base{fill:none;stroke:var(--ink);stroke-width:2;stroke-linecap:round}
+  .bt{fill:var(--ink)}
+  .sk text{font-family:"Segoe Print","Bradley Hand","Comic Sans MS","Chalkboard SE",cursive;font-size:19px}
+  .co text{font-family:"Segoe UI",Calibri,Arial,sans-serif;font-size:17px;font-weight:600}
+  .grid line{stroke:#e8edf3;stroke-width:1}
+  ol{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}
+  li{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:10px;border:2px solid transparent;font-size:17px;line-height:1.35;opacity:0;transform:translateX(14px);transition:opacity .5s ease,transform .5s ease,background .4s,border-color .4s;pointer-events:none}
+  li.show{opacity:1;transform:none;background:var(--bg,#fff)}
+  li.cur{border-color:var(--c)}
+  li .n{flex:0 0 28px;height:28px;border-radius:50%;background:#fff;border:2px solid var(--c);color:var(--cd);font-weight:700;display:grid;place-items:center;font-size:15px}
+  li b{color:var(--cd)}
+  li.bad{--c:var(--red);--cd:var(--red);--bg:var(--red-bg)}
+  li.nonum{font-weight:700}
+  li.nonum.bad{color:var(--red)}
+  nav{display:flex;gap:10px;justify-content:center;align-items:center;padding:16px 22px 22px;flex-wrap:wrap}
+  button{font:inherit;font-size:17px;padding:10px 20px;border-radius:10px;border:2px solid var(--blue);background:#fff;color:var(--blue);cursor:pointer;font-weight:600}
+  button.primary{background:var(--blue);color:#fff}
+  button:disabled{opacity:.35;cursor:default}
+  #cnt{min-width:110px;text-align:center;color:#556;font-weight:600}
+  @media (max-width:900px){main{grid-template-columns:1fr}.panel{min-height:0}}
+</style>
+</head>
+<body>
+<header><span class="tag">ES52 Isocèles</span><span class="bar"></span></header>
+<div id="tabs"></div>
+<main>
+  <section class="panel"><h2>Croquis</h2><svg id="sk" class="sk" viewBox="0 0 380 330"></svg></section>
+  <section class="panel"><h2>Construction</h2><svg id="co" class="co" viewBox="0 0 440 400"></svg></section>
+  <section class="panel"><h2>Marche à suivre</h2><ol id="steps"></ol></section>
+</main>
+<nav>
+  <button id="prev">◀ Précédent</button>
+  <span id="cnt"></span>
+  <button id="next" class="primary">Étape suivante ▶</button>
+  <button id="reset">↺ Recommencer</button>
+</nav>
+
+<script>
+const NS="http://www.w3.org/2000/svg", D2R=Math.PI/180;
+const cosd=a=>Math.cos(a*D2R), sind=a=>Math.sin(a*D2R);
+const polar=(P,r,a)=>[P[0]+r*cosd(a),P[1]+r*sind(a)];
+function mk(tag,attrs,parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e;}
+function setStep(e,s,d){e.dataset.s=s;if(d!=null)e.style.setProperty("--d",d+"s");return e;}
+function T(parent,x,y,s,cls,anchor){const t=mk("text",{x,y,"text-anchor":anchor||"middle"},parent);t.textContent=s;if(cls)t.setAttribute("class",cls);return t;}
+
+/* ===================== DONNÉES : CROQUIS (coordonnées brutes relevées sur la feuille) ===================== */
+const FIGS={};
+/* a) ABC isocèle, AB = 5 cm, angle BAC = 100° : l'angle obtus est forcément en A, donc AC = AB */
+FIGS.a={tab:'a)',
+  sk:{pts:{A:[385,60],B:[640,330],C:[120,325]},
+    sides:[{p:'AB',s:1,label:'5 cm',w:3,ticks:2,ts:3},{p:'AC',s:2,label:'5 cm',ls:3,w:-3,ticks:2,ts:3},{p:'BC',s:4,w:2}],
+    angles:[{at:'A',a:'C',b:'B',text:'100°',s:2}],
+    vl:{A:1,B:1,C:3},fill:4},
+  steps:[
+    {h:'Tracer <b>AB = 5 cm</b>'},
+    {h:'Tracer la demi-droite <b>Ad</b> formant un angle de <b>100°</b> avec AB.'},
+    {h:'Placer le point <b>C</b> sur la demi-droite <b>Ad</b> à <b>5 cm</b> de A'},
+    {h:'Tracer le triangle <b>ABC</b>'}],
+  co(){
+    const A=[0,0],B=[5,0],C=polar(A,5,100),I=[];
+    I.push(['seg',B,A,1,0],['tick',A,0,1,.7],['tick',B,0,1,.7],['lab',A,'A',1,.2,-16,22],['lab',B,'B',1,.2,16,22],['lab',[2.5,0],'5 cm',1,.8,0,30]);
+    I.push(['ang',A,0,100,40,'100°',2,0],['xm',A,100,40,2,.5],['ray',A,100,6.8,2,.9],['lab',polar(A,6.8,100),'d',2,1.2,-12,0]);
+    I.push(['dot',C,3,0],['lab',C,'C',3,.3,-16,-4],['lab',polar(A,2.5,100),'5 cm',3,.5,-30,0]);
+    I.push(['poly',[A,B,C],4]);
+    return I;}
+};
+/* b) cas 1 : l'angle de 50° est au sommet D, donc DF = DE */
+FIGS.b1={tab:'b) 1',
+  sk:{pts:{D:[240,20],E:[385,340],F:[95,340]},
+    sides:[{p:'DE',s:1,label:'4 cm',w:3,ticks:2,ts:3},{p:'DF',s:2,w:-3,ticks:2,ts:3},{p:'EF',s:4,w:2}],
+    angles:[{at:'D',a:'E',b:'F',text:'50°',s:2}],
+    vl:{D:1,E:1,F:3},fill:4},
+  steps:[
+    {h:'Tracer <b>DE = 4 cm</b>'},
+    {h:'Tracer la demi-droite <b>Dd</b> formant un angle de <b>50°</b> avec DE.'},
+    {h:'Placer le point <b>F</b> sur la demi-droite <b>Dd</b> à <b>4 cm</b> de D'},
+    {h:'Tracer le triangle <b>DEF</b>'}],
+  co(){
+    const D=[0,0],E=[4,0],F=polar(D,4,50),I=[];
+    I.push(['seg',D,E,1,0],['tick',D,0,1,.7],['tick',E,0,1,.7],['lab',D,'D',1,.2,-16,22],['lab',E,'E',1,.2,16,22],['lab',[2,0],'4 cm',1,.8,0,30]);
+    I.push(['ang',D,0,50,46,'50°',2,0],['xm',D,50,46,2,.5],['ray',D,50,5.4,2,.9],['lab',polar(D,5.4,50),'d',2,1.2,12,-4]);
+    I.push(['dot',F,3,0],['lab',F,'F',3,.3,-14,-10],['lab',polar(D,2,50),'4 cm',3,.5,-28,-6]);
+    I.push(['poly',[D,E,F],4]);
+    return I;}
+};
+/* b) cas 2 : angles de 50° en D et en E (DE est la base) */
+FIGS.b2={tab:'b) 2',
+  sk:{pts:{D:[70,330],E:[360,330],F:[215,90]},
+    sides:[{p:'DE',s:1,label:'4 cm',w:3},{p:'DF',s:2,w:-3},{p:'EF',s:3,w:3}],
+    angles:[{at:'D',a:'E',b:'F',text:'50°',s:2},{at:'E',a:'D',b:'F',text:'50°',s:3}],
+    vl:{D:1,E:1,F:4},fill:5},
+  steps:[
+    {h:'Tracer <b>DE = 4 cm</b>'},
+    {h:'Tracer une demi-droite <b>Dd</b> formant un angle de <b>50°</b> avec DE'},
+    {h:'Tracer une demi-droite <b>Ee</b> formant un angle de <b>50°</b> avec ED'},
+    {h:'Les demi-droites <b>Dd</b> et <b>Ee</b> se coupent en <b>F</b>'},
+    {h:'Tracer le triangle <b>DEF</b>'}],
+  co(){
+    const D=[0,0],E=[4,0],F=[2,2*Math.tan(50*Math.PI/180)],I=[];
+    I.push(['seg',D,E,1,0],['tick',D,0,1,.7],['tick',E,0,1,.7],['lab',D,'D',1,.2,-16,22],['lab',E,'E',1,.2,16,22],['lab',[2,0],'4 cm',1,.8,0,30]);
+    I.push(['ang',D,0,50,46,'50°',2,0],['xm',D,50,46,2,.5],['ray',D,50,4.3,2,.9],['lab',polar(D,4.3,50),'d',2,1.2,12,-4]);
+    I.push(['ang',E,180,130,46,'50°',3,0],['xm',E,130,46,3,.5],['ray',E,130,4.3,3,.9],['lab',polar(E,4.3,130),'e',3,1.2,-12,-4]);
+    I.push(['dot',F,4,0],['lab',F,'F',4,.3,0,-14]);
+    I.push(['poly',[D,E,F],5]);
+    return I;}
+};
+/* b) cas 3 : angles de 50° en D et en F (EF = ED) */
+FIGS.b3={tab:'b) 3',
+  sk:{pts:{E:[215,35],D:[70,330],F:[360,330]},
+    sides:[{p:'DE',s:1,label:'4 cm',w:3,ticks:2,ts:3},{p:'DF',s:2,w:-3},{p:'EF',s:3,w:3,ticks:2,ts:3}],
+    angles:[{at:'D',a:'F',b:'E',text:'50°',s:2},{at:'F',a:'D',b:'E',text:'50°',s:4}],
+    vl:{D:1,E:1,F:4},fill:5},
+  steps:[
+    {h:'Tracer <b>DE = 4 cm</b>'},
+    {h:'Tracer une demi-droite <b>Dd</b> formant un angle de <b>50°</b> avec DE'},
+    {h:'Tracer un cercle <b>f</b> (E&nbsp;; <b>4 cm</b>)'},
+    {h:'La demi-droite <b>Dd</b> et le cercle <b>f</b> se coupent en <b>D</b> et <b>F</b>'},
+    {h:'Tracer le triangle <b>DEF</b>'}],
+  co(){
+    const D=[0,0],E=[4,0],F=polar(D,8*Math.cos(50*Math.PI/180),50),I=[];
+    I.push(['seg',D,E,1,0],['tick',D,0,1,.7],['tick',E,0,1,.7],['lab',D,'D',1,.2,-16,22],['lab',E,'E',1,.2,16,22],['lab',[2,0],'4 cm',1,.8,0,30]);
+    I.push(['ang',D,0,50,46,'50°',2,0],['xm',D,50,46,2,.5],['ray',D,50,6.2,2,.9],['lab',polar(D,6.2,50),'d',2,1.2,12,-4]);
+    I.push(['arc',E,4,55,205,3,0],['lab',polar(E,4,55),'f',3,.8,14,-2]);
+    I.push(['ring',D,4,.2],['dot',F,4,0],['lab',F,'F',4,.3,-14,-8]);
+    I.push(['poly',[D,E,F],5]);
+    return I;}
+};
+
+/* ===================== DESSIN DU CROQUIS ===================== */
+function arcPathScreen(P,a1,a2,r){ // angles écran (rad)
+  let diff=a2-a1;while(diff>Math.PI)diff-=2*Math.PI;while(diff<-Math.PI)diff+=2*Math.PI;
+  return `M${P[0]+r*Math.cos(a1)} ${P[1]+r*Math.sin(a1)} A${r} ${r} 0 0 ${diff>0?1:0} ${P[0]+r*Math.cos(a2)} ${P[1]+r*Math.sin(a2)}`;
+}
+function drawSketch(svg,S){
+  svg.innerHTML="";
+  const raw=S.pts,names=Object.keys(raw);
+  const xs=names.map(n=>raw[n][0]),ys=names.map(n=>raw[n][1]);
+  const minx=Math.min(...xs),maxx=Math.max(...xs),miny=Math.min(...ys),maxy=Math.max(...ys);
+  const W=380,H=330,padx=64,pady=52,sc=Math.min((W-2*padx)/(maxx-minx),(H-2*pady)/(maxy-miny));
+  const ox=(W-(maxx-minx)*sc)/2,oy=(H-(maxy-miny)*sc)/2;
+  const P={};names.forEach(n=>P[n]=[ox+(raw[n][0]-minx)*sc,oy+(raw[n][1]-miny)*sc]);
+  const cen=[0,1].map(i=>names.reduce((s,n)=>s+P[n][i],0)/names.length);
+  const g=mk("g",{},svg),els=[];
+  const unit=(v)=>{const n=Math.hypot(v[0],v[1])||1;return [v[0]/n,v[1]/n];};
+  function both(d,step,delay,cls){mk("path",{d,class:"base"},g);const o=mk("path",{d,class:"ov"+(cls?" "+cls:""),pathLength:1},g);setStep(o,step,delay);return o;}
+  function lab(x,y,s,step,anchor,delay){T(g,x,y,s,"bt",anchor);setStep(T(g,x,y,s,"ovt",anchor),step,delay);}
+  if(S.fill)setStep(mk("polygon",{points:names.map(n=>P[n].join(",")).join(" "),class:"fillg"},g),S.fill);
+  S.sides.forEach(sd=>{
+    const p=P[sd.p[0]],q=P[sd.p[1]],mx=(p[0]+q[0])/2,my=(p[1]+q[1])/2,dx=q[0]-p[0],dy=q[1]-p[1],n=Math.hypot(dx,dy),k=sd.w||0;
+    both(`M${p[0]} ${p[1]} Q${mx-dy/n*k} ${my+dx/n*k} ${q[0]} ${q[1]}`,sd.s,.3);
+    const out=unit([mx-cen[0],my-cen[1]]);
+    if(sd.label){const off=14+sd.label.length*4.6*Math.abs(out[0])+10*Math.abs(out[1]);lab(mx+out[0]*off,my+out[1]*off+6,sd.label,sd.ls||sd.s,"middle",.8);}
+    if(sd.ticks){const u=unit([dx,dy]),nx=-u[1],ny=u[0];let d="";for(let i=0;i<sd.ticks;i++){const t=(i-(sd.ticks-1)/2)*6,cx=mx+u[0]*t,cy=my+u[1]*t;d+=`M${cx-nx*7} ${cy-ny*7} L${cx+nx*7} ${cy+ny*7} `;}both(d,sd.ts||sd.s,.8);}
+  });
+  (S.angles||[]).forEach(an=>{
+    const V=P[an.at],a1=Math.atan2(P[an.a][1]-V[1],P[an.a][0]-V[0]),a2=Math.atan2(P[an.b][1]-V[1],P[an.b][0]-V[0]);
+    if(an.right){const u1=[Math.cos(a1),Math.sin(a1)],u2=[Math.cos(a2),Math.sin(a2)],k=15;
+      both(`M${V[0]+k*u1[0]} ${V[1]+k*u1[1]} L${V[0]+k*(u1[0]+u2[0])} ${V[1]+k*(u1[1]+u2[1])} L${V[0]+k*u2[0]} ${V[1]+k*u2[1]}`,an.s,.9);return;}
+    const r=30;both(arcPathScreen(V,a1,a2,r),an.s,.9);
+    let diff=a2-a1;while(diff>Math.PI)diff-=2*Math.PI;while(diff<-Math.PI)diff+=2*Math.PI;
+    const m=a1+diff/2,rr=r+24;lab(V[0]+rr*Math.cos(m),V[1]+rr*Math.sin(m)+6,an.text,an.s,"middle",1.1);
+  });
+  names.forEach(n=>{
+    const out=unit([P[n][0]-cen[0],P[n][1]-cen[1]]),x=P[n][0]+out[0]*24,y=P[n][1]+out[1]*24+6;
+    mk("path",{d:`M${P[n][0]-6} ${P[n][1]-6} L${P[n][0]+6} ${P[n][1]+6} M${P[n][0]-6} ${P[n][1]+6} L${P[n][0]+6} ${P[n][1]-6}`,class:"base"},g);
+    const st=S.vl[n];
+    if(st!=null){both(`M${P[n][0]-6} ${P[n][1]-6} L${P[n][0]+6} ${P[n][1]+6} M${P[n][0]-6} ${P[n][1]+6} L${P[n][0]+6} ${P[n][1]-6}`,st,.5);}
+    lab(x,y,n,st==null?99:st,"middle",.3);
+  });
+}
+
+/* ===================== DESSIN DE LA CONSTRUCTION (à l'échelle) ===================== */
+function drawCons(svg,items){
+  svg.innerHTML="";
+  const W=440,H=400,pad=52,pts=[];
+  const sample=(C,r,a1,a2)=>{for(let a=a1;a<=a2;a+=4)pts.push(polar(C,r,a));pts.push(polar(C,r,a2));};
+  items.forEach(it=>{const t=it[0];
+    if(t==='seg')pts.push(it[1],it[2]);
+    else if(t==='ray')pts.push(it[1],polar(it[1],it[3],it[2]));
+    else if(t==='arc')sample(it[1],it[2],it[3],it[4]);
+    else if(t==='circ')sample(it[1],it[2],0,360);
+    else if(t==='dot'||t==='ring'||t==='xp')pts.push(it[1]);
+    else if(t==='poly')it[1].forEach(p=>pts.push(p));
+    else if(t==='ang'||t==='sq')pts.push(it[1]);
+  });
+  const xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]);
+  const minx=Math.min(...xs),maxx=Math.max(...xs),miny=Math.min(...ys),maxy=Math.max(...ys);
+  const s=Math.min(70,(W-2*pad)/(maxx-minx),(H-2*pad)/(maxy-miny));
+  const ox=(W-(maxx-minx)*s)/2,oy=(H-(maxy-miny)*s)/2;
+  const X=x=>ox+(x-minx)*s, Y=y=>H-(oy+(y-miny)*s), Pt=p=>[X(p[0]),Y(p[1])];
+  // grille au cm
+  const gr=mk("g",{class:"grid"},svg);
+  for(let x=Math.ceil(minx-ox/s);X(x)<=W;x++)mk("line",{x1:X(x),y1:0,x2:X(x),y2:H},gr);
+  for(let y=Math.ceil(miny-oy/s);Y(y)>=0;y++)mk("line",{x1:0,y1:Y(y),x2:W,y2:Y(y)},gr);
+  const g=mk("g",{},svg);
+  const ov=(d,st,dl,cls)=>setStep(mk("path",{d,class:"ov"+(cls?" "+cls:""),pathLength:1},g),st,dl);
+  const arcD=(C,r,a1,a2)=>{const c=Pt(C),R=r*s,p1=[c[0]+R*cosd(a1),c[1]-R*sind(a1)],p2=[c[0]+R*cosd(a2),c[1]-R*sind(a2)];
+    return `M${p1[0]} ${p1[1]} A${R} ${R} 0 ${Math.abs(a2-a1)>180?1:0} ${a2>a1?0:1} ${p2[0]} ${p2[1]}`;};
+  items.forEach(it=>{const t=it[0];
+    if(t==='poly'){const pp=it[1].map(Pt);setStep(mk("polygon",{points:pp.map(p=>p.join(",")).join(" "),class:"fillg"},g),it[2],it[3]);
+      const o=ov(`M${pp[0][0]} ${pp[0][1]} L${pp[1][0]} ${pp[1][1]} L${pp[2][0]} ${pp[2][1]} Z`,it[2],(it[3]||0)+.2);o.setAttribute("stroke-width",5);}
+    else if(t==='seg'){const a=Pt(it[1]),b=Pt(it[2]);ov(`M${a[0]} ${a[1]} L${b[0]} ${b[1]}`,it[3],it[4],it[5]);}
+    else if(t==='ray'){const a=Pt(it[1]),b=Pt(polar(it[1],it[3],it[2]));ov(`M${a[0]} ${a[1]} L${b[0]} ${b[1]}`,it[4],it[5]);}
+    else if(t==='tick'){const a=Pt(it[1]);ov(`M${a[0]} ${a[1]-8} L${a[0]} ${a[1]+8}`,it[3],it[4]);}
+    else if(t==='arc')ov(arcD(it[1],it[2],it[3],it[4]),it[5],it[6],"thin");
+    else if(t==='circ'){const c=Pt(it[1]),R=it[2]*s;ov(`M${c[0]+R} ${c[1]} A${R} ${R} 0 1 0 ${c[0]-R} ${c[1]} A${R} ${R} 0 1 0 ${c[0]+R} ${c[1]}`,it[3],it[4],"thin");}
+    else if(t==='dot'){const c=Pt(it[1]);setStep(mk("circle",{cx:c[0],cy:c[1],r:6,class:"pop"},g),it[2],it[3]);}
+    else if(t==='ring'){const c=Pt(it[1]);ov(`M${c[0]+11} ${c[1]} A11 11 0 1 0 ${c[0]-11} ${c[1]} A11 11 0 1 0 ${c[0]+11} ${c[1]}`,it[2],it[3]);}
+    else if(t==='lab'){const c=Pt(it[1]);setStep(T(g,c[0]+it[5],c[1]+it[6],it[2],"ovt","middle"),it[3],it[4]);}
+    else if(t==='ang'){ // ['ang',P,a1,a2,rpx,texte,step,delay]
+      const c=Pt(it[1]),a1=it[2],a2=it[3],r=it[4];
+      ov(`M${c[0]+r*cosd(a1)} ${c[1]-r*sind(a1)} A${r} ${r} 0 0 ${a2>a1?0:1} ${c[0]+r*cosd(a2)} ${c[1]-r*sind(a2)}`,it[6],it[7]);
+      const m=(a1+a2)/2,rr=r+22;setStep(T(g,c[0]+rr*cosd(m),c[1]-rr*sind(m)+6,it[5],"ovt","middle"),it[6],1.2);}
+    else if(t==='xm'){ // repère du rapporteur
+      const c=Pt(it[1]),px=c[0]+it[3]*cosd(it[2]),py=c[1]-it[3]*sind(it[2]);
+      ov(`M${px-5} ${py-5} L${px+5} ${py+5} M${px-5} ${py+5} L${px+5} ${py-5}`,it[4],it[5]).setAttribute("stroke-width",2.5);}
+    else if(t==='xp'){const c=Pt(it[1]);ov(`M${c[0]-5} ${c[1]-5} L${c[0]+5} ${c[1]+5} M${c[0]-5} ${c[1]+5} L${c[0]+5} ${c[1]-5}`,it[2],it[3]).setAttribute("stroke-width",2.5);}
+    else if(t==='sq'){ // angle droit : ['sq',P,a1,a2,step,delay]
+      const c=Pt(it[1]),k=16,u1=[cosd(it[2]),-sind(it[2])],u2=[cosd(it[3]),-sind(it[3])];
+      ov(`M${c[0]+k*u1[0]} ${c[1]+k*u1[1]} L${c[0]+k*(u1[0]+u2[0])} ${c[1]+k*(u1[1]+u2[1])} L${c[0]+k*u2[0]} ${c[1]+k*u2[1]}`,it[4],it[5]);}
+  });
+}
+
+/* ===================== PAS À PAS ===================== */
+let cur="a",step=0,MAX=0,els=[],lis=[],lm=null;
+const prev=document.getElementById("prev"),next=document.getElementById("next"),cnt=document.getElementById("cnt"),ol=document.getElementById("steps");
+function apply(){
+  els.forEach(e=>e.classList.toggle("on",+e.dataset.s<=step));
+  const L=lm?lm[step]:step;lis.forEach(li=>{const i=+li.dataset.i;li.classList.toggle("show",i<=L);li.classList.toggle("cur",i===L);});
+  prev.disabled=step===0;next.disabled=step===MAX;
+  cnt.textContent=step===0?"Prêt":(step===MAX?"Terminé":"Clic "+step+" / "+MAX);
+}
+function go(n){step=Math.max(0,Math.min(MAX,n));apply();}
+const PAL=[
+  {c:'#3b9be0',d:'#1f6fb2',bg:'#e6f2fc'},
+  {c:'#f2993a',d:'#b8670f',bg:'#fdf0e0'},
+  {c:'#9b6fd6',d:'#6a3fb0',bg:'#f0e9fb'},
+  {c:'#e66a9c',d:'#b83a6e',bg:'#fce8f0'},
+  {c:'#2fb5a3',d:'#1a7d6f',bg:'#e0f5f2'},
+  {c:'#c9b21a',d:'#8a7a00',bg:'#f9f5d6'}];
+function paint(el,i){const k=PAL[(i-1)%PAL.length];el.style.setProperty('--c',k.c);el.style.setProperty('--cd',k.d);el.style.setProperty('--bg',k.bg);}
+function load(key){
+  cur=key;const F=FIGS[key];
+  drawSketch(document.getElementById("sk"),F.sk);
+  drawCons(document.getElementById("co"),F.co());
+  ol.innerHTML="";let n=0;
+  F.steps.forEach((st,i)=>{const li=document.createElement("li");li.dataset.i=i+1;
+    if(st.bad)li.classList.add("bad");if(st.nonum)li.classList.add("nonum");
+    li.innerHTML=(st.nonum?"":`<span class="n">${++n}</span>`)+`<span>${st.h}</span>`;ol.appendChild(li);});
+  lm=F.lm||null;MAX=lm?lm.length-1:F.steps.length;lis=[...ol.children];els=[...document.querySelectorAll("#sk [data-s],#co [data-s]")];
+  els.forEach(e=>paint(e,lm?lm[+e.dataset.s]:+e.dataset.s));
+  lis.forEach(li=>{if(!li.classList.contains('bad'))paint(li,+li.dataset.i);});
+  document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("act",b.dataset.k===key));
+  step=0;apply();
+}
+const tabs=document.getElementById("tabs");
+Object.keys(FIGS).forEach(k=>{const b=document.createElement("button");b.textContent=FIGS[k].tab;b.dataset.k=k;b.onclick=()=>load(k);tabs.appendChild(b);});
+next.onclick=()=>go(step+1);prev.onclick=()=>go(step-1);document.getElementById("reset").onclick=()=>go(0);
+document.addEventListener("keydown",e=>{
+  if(["ArrowRight"," ","Enter","PageDown"].includes(e.key)){e.preventDefault();go(step+1);}
+  else if(["ArrowLeft","Backspace","PageUp"].includes(e.key)){e.preventDefault();go(step-1);}
+  else if(e.key==="Home")go(0);
+});
+load("a");
+</script>
+</body>
+</html>
